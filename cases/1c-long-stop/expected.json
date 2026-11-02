@@ -1,0 +1,102 @@
+{
+  "case": "1c-long-stop",
+  "spec": "CORE_MODEL §8 1c；§5 BS 清线、PS 停前日（长停 91）、停线、补线、阶段重叠（rev 153）",
+  "engine": {
+    "status": "FEASIBLE",
+    "compare": "none",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [
+      {
+        "start": "2026-02-14",
+        "end": "2026-03-01",
+        "length": 16,
+        "pre_stop_date": "2026-02-13",
+        "target": 91,
+        "source": "DEFAULT"
+      }
+    ]
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-02-02": "NORMAL",
+      "2026-02-03": "NORMAL",
+      "2026-02-04": "NORMAL",
+      "2026-02-05": "NORMAL",
+      "2026-02-06": "NORMAL",
+      "2026-02-07": "NORMAL",
+      "2026-02-08": "NORMAL",
+      "2026-02-09": "NORMAL",
+      "2026-02-10": "NORMAL",
+      "2026-02-11": "NORMAL",
+      "2026-02-12": "PS_PRE_STOP+BS_CLEAR",
+      "2026-02-13": "PS_PRE_STOP+BS_CLEAR",
+      "2026-02-14": "STOP",
+      "2026-02-15": "STOP",
+      "2026-02-16": "STOP",
+      "2026-02-17": "STOP",
+      "2026-02-18": "STOP",
+      "2026-02-19": "STOP",
+      "2026-02-20": "STOP",
+      "2026-02-21": "STOP",
+      "2026-02-22": "STOP",
+      "2026-02-23": "STOP",
+      "2026-02-24": "STOP",
+      "2026-02-25": "STOP",
+      "2026-02-26": "STOP",
+      "2026-02-27": "STOP",
+      "2026-02-28": "STOP",
+      "2026-03-01": "STOP",
+      "2026-03-02": "REFILL",
+      "2026-03-03": "REFILL",
+      "2026-03-04": "NORMAL",
+      "2026-03-05": "NORMAL",
+      "2026-03-06": "NORMAL"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/wbs-not-cleared.plan.json",
+      "why": "长停前 WBS 没清到 0，24 台车在 WBS 里过了 16 天假",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "BS_CLEAR",
+          "C7",
+          "PS_PRE_STOP"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/refill-bs-leak.plan.json",
+      "why": "补线首日 BS1 没补到目标就向下游出车",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "REFILL"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

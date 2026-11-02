@@ -1,0 +1,1326 @@
+{
+  "case": "1b-two-models-changeover",
+  "spec": "CORE_MODEL §8 1b；C4、C15 镜像、§5 换型（2026-10-24 裁决）、C16 顺接换型（rev 169）",
+  "engine": {
+    "status": "FEASIBLE",
+    "compare": "aggregate",
+    "model_totals": {
+      "fok": {
+        "A": 1333,
+        "B": 187
+      }
+    },
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [],
+    "days": [
+      {
+        "date": "2026-03-02",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 80,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-03",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 160,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-04",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 240,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-05",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 320,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-06",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 400,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-07",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 400,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-08",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 400,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-09",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 480,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-10",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 560,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-11",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 640,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-12",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 720,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-13",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 800,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-14",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 800,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-15",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 800,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-16",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 80,
+            "out": 80
+          }
+        },
+        "eod": {
+          "BS1": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 80,
+        "fin": 880,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-17",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "in": 0,
+            "out": 69
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 69,
+            "out": 69
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 69,
+            "out": 69
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 69,
+            "out": 69
+          }
+        },
+        "eod": {
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 69,
+        "fin": 949,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-18",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS2": 64,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 949,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-19",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 59
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 59,
+            "out": 59
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 59,
+            "out": 59
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 59,
+            "out": 59
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 59,
+        "fin": 1008,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-20",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1072,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-21",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 1072,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-22",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 1072,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-23",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1136,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-24",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1200,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-25",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1264,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-26",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1328,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-27",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1392,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-28",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 1392,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-29",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "PS": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 0,
+        "fin": 1392,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-30",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 1456,
+        "bl": 0
+      },
+      {
+        "date": "2026-03-31",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "in": 0,
+            "out": 0
+          },
+          "BS2": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "in": 64,
+            "out": 64
+          }
+        },
+        "eod": {
+          "BS2": 69,
+          "WBS": 37,
+          "PS": 147,
+          "PBS": 80,
+          "AS_MAIN": 100,
+          "AS_FIN": 40
+        },
+        "fok": 64,
+        "fin": 0,
+        "bl": 0
+      }
+    ]
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-03-02": "NORMAL",
+      "2026-03-03": "NORMAL",
+      "2026-03-04": "NORMAL",
+      "2026-03-05": "NORMAL",
+      "2026-03-06": "NORMAL",
+      "2026-03-07": "NORMAL",
+      "2026-03-08": "NORMAL",
+      "2026-03-09": "NORMAL",
+      "2026-03-10": "NORMAL",
+      "2026-03-11": "NORMAL",
+      "2026-03-12": "NORMAL",
+      "2026-03-13": "NORMAL",
+      "2026-03-14": "NORMAL",
+      "2026-03-15": "NORMAL",
+      "2026-03-16": "NORMAL",
+      "2026-03-17": "CHANGEOVER",
+      "2026-03-18": "CHANGEOVER",
+      "2026-03-19": "CHANGEOVER",
+      "2026-03-20": "NORMAL",
+      "2026-03-21": "NORMAL",
+      "2026-03-22": "NORMAL",
+      "2026-03-23": "NORMAL",
+      "2026-03-24": "NORMAL",
+      "2026-03-25": "NORMAL",
+      "2026-03-26": "NORMAL",
+      "2026-03-27": "NORMAL",
+      "2026-03-28": "NORMAL",
+      "2026-03-29": "NORMAL",
+      "2026-03-30": "NORMAL",
+      "2026-03-31": "NORMAL"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/wbs-hold-32.plan.json",
+      "why": "03-17 PS 只吃 37、WBS 压到 69：上游有车、下游未满，换型补满期 PS 不满产（rev 182 起违反 C14）",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C14"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/refill-early-supply.plan.json",
+      "why": "换型期 WBS 未回到目标就向 PS 供车，违反逐级补满",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C14",
+          "CHANGEOVER"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

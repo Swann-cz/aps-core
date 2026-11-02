@@ -1,0 +1,424 @@
+{
+  "case": "1c-standard-refill",
+  "spec": "CORE_MODEL §5 补线行（期初低于目标、逐级补满，B13；补线按满产推进，rev 182）、C14、C17",
+  "engine": {
+    "status": "FEASIBLE",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 0,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [],
+    "days": [
+      {
+        "date": "2026-03-23",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 10
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 70
+          },
+          "WBS": {
+            "A": 10
+          },
+          "PS": {
+            "A": 91
+          },
+          "PBS": {
+            "A": 45
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 80
+          }
+        },
+        "fok": {},
+        "fin": {},
+        "bl": {}
+      },
+      {
+        "date": "2026-03-24",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 55
+            },
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 70
+          },
+          "WBS": {
+            "A": 35
+          },
+          "PS": {
+            "A": 146
+          },
+          "PBS": {
+            "A": 45
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 80
+          }
+        },
+        "fok": {},
+        "fin": {},
+        "bl": {}
+      },
+      {
+        "date": "2026-03-25",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 76
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 76
+            },
+            "out": {
+              "A": 76
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 76
+            },
+            "out": {
+              "A": 76
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 70
+          },
+          "WBS": {
+            "A": 35
+          },
+          "PS": {
+            "A": 150
+          },
+          "PBS": {
+            "A": 45
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 80
+          }
+        },
+        "fok": {
+          "A": 76
+        },
+        "fin": {
+          "A": 76
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-03-26",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 70
+          },
+          "WBS": {
+            "A": 35
+          },
+          "PS": {
+            "A": 150
+          },
+          "PBS": {
+            "A": 45
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 80
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 156
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-03-27",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 70
+          },
+          "WBS": {
+            "A": 35
+          },
+          "PS": {
+            "A": 150
+          },
+          "PBS": {
+            "A": 45
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 80
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {},
+        "bl": {}
+      }
+    ]
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 0,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-03-23": "REFILL",
+      "2026-03-24": "REFILL",
+      "2026-03-25": "REFILL",
+      "2026-03-26": "NORMAL",
+      "2026-03-27": "NORMAL"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/refill-underfeed.plan.json",
+      "why": "复线首日焊装只投 48、不出车",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C11",
+          "C14"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/lone-output.plan.json",
+      "why": "复线首日完成线无投入单独出 3 台",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C17",
+          "REFILL"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

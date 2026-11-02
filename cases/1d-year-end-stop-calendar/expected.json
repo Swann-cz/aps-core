@@ -1,0 +1,75 @@
+{
+  "case": "1d-year-end-stop-calendar",
+  "spec": "CORE_MODEL §5 停线行（带下一年日历时以日历为准，rev 159）、PS 停前日（长停 91）、BS 清线",
+  "engine": {
+    "status": "FEASIBLE",
+    "compare": "none",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [
+      {
+        "start": "2026-12-29",
+        "end": "2027-01-12",
+        "length": 15,
+        "pre_stop_date": "2026-12-28",
+        "target": 91,
+        "source": "DEFAULT"
+      }
+    ]
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-12-14": "NORMAL",
+      "2026-12-15": "NORMAL",
+      "2026-12-16": "NORMAL",
+      "2026-12-17": "NORMAL",
+      "2026-12-18": "NORMAL",
+      "2026-12-19": "NORMAL",
+      "2026-12-20": "NORMAL",
+      "2026-12-21": "NORMAL",
+      "2026-12-22": "NORMAL",
+      "2026-12-23": "NORMAL",
+      "2026-12-24": "NORMAL",
+      "2026-12-25": "PS_PRE_STOP+BS_CLEAR",
+      "2026-12-26": "PS_PRE_STOP",
+      "2026-12-27": "PS_PRE_STOP",
+      "2026-12-28": "PS_PRE_STOP+BS_CLEAR",
+      "2026-12-29": "STOP",
+      "2026-12-30": "STOP",
+      "2026-12-31": "STOP"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/calendar-ignored.plan.json",
+      "why": "没看下一年日历：停前 PS 取 131，焊装没清线就进了 15 天长停",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "BS_CLEAR",
+          "PS_PRE_STOP"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

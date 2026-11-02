@@ -1,0 +1,68 @@
+{
+  "case": "1d-first-start-changeover",
+  "spec": "CORE_MODEL §5 首次启动、换型（每次清旧线；换型闲置线不算长停，rev 161）、C12 月度带、C16 顺接换型（rev 169）",
+  "engine": {
+    "status": "FEASIBLE",
+    "compare": "none",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 4,
+      "L2": 2
+    },
+    "stop_list": [],
+    "model_totals": {
+      "fok": {
+        "A": 1040,
+        "B": 200
+      }
+    }
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 4,
+      "L2": 2
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/first-start-early.plan.json",
+      "why": "B 首次出车当天 BS2 日末 36，没到目标 100",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "CHANGEOVER",
+          "FIRST_START"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/b-overtakes-a-in-ps.plan.json",
+      "why": "11-19 PS 里旧车型 A 还剩 10 台，新车型 B 先出 20 台",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "SEQ"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/second-change-dirty.plan.json",
+      "why": "换回 A 时 BS2 还剩 36 台就开 BS1，之后 BS2 闲置仍有车",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C6",
+          "C8",
+          "CHANGEOVER"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

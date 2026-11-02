@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "aps-server", "runtimeExecutable": "python", "runtimeArgs": ["-m", "server"], "port": 8765, "url": "http://127.0.0.1:8765" },
+    { "name": "aps-ui", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "ui", "run", "dev"], "port": 5173 }
+  ]
+}

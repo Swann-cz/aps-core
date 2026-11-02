@@ -1,0 +1,165 @@
+{
+  "schema": "aps-core/input/v1",
+  "horizon": {
+    "start": "2026-03-02",
+    "end": "2026-03-11"
+  },
+  "calendar": [
+    {
+      "date": "2026-03-02",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-03",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-04",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-05",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-06",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-07",
+      "is_working_capable": false
+    },
+    {
+      "date": "2026-03-08",
+      "is_working_capable": false
+    },
+    {
+      "date": "2026-03-09",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-10",
+      "is_working_capable": true
+    },
+    {
+      "date": "2026-03-11",
+      "is_working_capable": true
+    }
+  ],
+  "factory": {
+    "workshops": {
+      "BS1": {
+        "jph": 10
+      },
+      "BS2": {
+        "jph": 8
+      },
+      "PS": {
+        "jph": 10
+      },
+      "AS_MAIN": {
+        "jph": 10
+      },
+      "AS_FIN": {
+        "jph": 10
+      }
+    },
+    "buffers": {
+      "WBS": {
+        "cap_max": 69
+      },
+      "PBS": {
+        "cap_max": 150
+      }
+    },
+    "modes": {
+      "OFF": 0,
+      "SINGLE_8H": 8,
+      "SINGLE_8P2": 10,
+      "DOUBLE_SHIFT": 16
+    },
+    "default_mode": "SINGLE_8H",
+    "models": {
+      "A": {
+        "line": "BS1",
+        "glue_age_max": 14
+      }
+    },
+    "flow": [
+      "BS1>WBS",
+      "BS2>WBS",
+      "WBS>PS",
+      "PS>PBS",
+      "PBS>AS_MAIN",
+      "AS_MAIN>AS_FIN",
+      "AS_FIN>FIN"
+    ],
+    "shared_welding_jph_max": 13
+  },
+  "demand": {
+    "PR": {
+      "A": {
+        "2026-03": 600
+      }
+    },
+    "WS_daily": {
+      "A": {
+        "2026-03-11": 600
+      }
+    }
+  },
+  "initial": {
+    "wip": {
+      "BS1": {
+        "A": 69
+      },
+      "WBS": {
+        "A": 37
+      },
+      "PS": {
+        "A": 147
+      },
+      "PBS": {
+        "A": 80
+      },
+      "AS_MAIN": {
+        "A": 100
+      },
+      "AS_FIN": {
+        "A": 40
+      }
+    },
+    "fin": {
+      "A": 0
+    }
+  },
+  "wip_targets": {
+    "BS1": 69,
+    "BS2": 69,
+    "WBS": 37,
+    "PS": 147,
+    "PBS": 80,
+    "AS_MAIN": 100,
+    "AS_FIN": 40
+  },
+  "wbs_hi": null,
+  "conditions": [
+    {
+      "id": "ONE",
+      "type": "CAPACITY_LOSS",
+      "start": "2026-03-04",
+      "end": "2026-03-04",
+      "workshops": [
+        "PS"
+      ],
+      "hours_max": 4
+    }
+  ],
+  "rules": {
+    "ps_stop_min_days": 3,
+    "ps_long_stop_days": 15,
+    "ps_pre_stop_target_short": 131,
+    "ps_pre_stop_target_long": 91,
+    "monthly_band_ratio": 0.1
+  }
+}

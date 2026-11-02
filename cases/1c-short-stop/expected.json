@@ -1,0 +1,940 @@
+{
+  "case": "1c-short-stop",
+  "spec": "CORE_MODEL §8 1c；§5 PS 停前日、停线（短停不补线，rev 153）",
+  "engine": {
+    "status": "FEASIBLE",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 0,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [
+      {
+        "start": "2026-04-02",
+        "end": "2026-04-05",
+        "length": 4,
+        "pre_stop_date": "2026-04-01",
+        "target": 131,
+        "source": "DEFAULT"
+      }
+    ],
+    "days": [
+      {
+        "date": "2026-03-30",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-03-31",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {},
+        "bl": {}
+      },
+      {
+        "date": "2026-04-01",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 64
+            },
+            "out": {
+              "A": 64
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 64
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 131
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-02",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 131
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {},
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-03",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 131
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {},
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-04",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 131
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {},
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-05",
+        "workshops": {
+          "BS1": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_MAIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "AS_FIN": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 131
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {},
+        "fin": {
+          "A": 80
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-06",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 64
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 64
+            },
+            "out": {
+              "A": 64
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 64
+            },
+            "out": {
+              "A": 64
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 64
+        },
+        "fin": {
+          "A": 144
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-07",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 224
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-08",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 304
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-09",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {
+          "A": 384
+        },
+        "bl": {}
+      },
+      {
+        "date": "2026-04-10",
+        "workshops": {
+          "BS1": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "BS2": {
+            "mode": "OFF",
+            "hours": 0,
+            "in": {},
+            "out": {}
+          },
+          "PS": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_MAIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          },
+          "AS_FIN": {
+            "mode": "SINGLE_8H",
+            "hours": 8,
+            "in": {
+              "A": 80
+            },
+            "out": {
+              "A": 80
+            }
+          }
+        },
+        "eod": {
+          "BS1": {
+            "A": 69
+          },
+          "WBS": {
+            "A": 37
+          },
+          "PS": {
+            "A": 147
+          },
+          "PBS": {
+            "A": 80
+          },
+          "AS_MAIN": {
+            "A": 100
+          },
+          "AS_FIN": {
+            "A": 40
+          }
+        },
+        "fok": {
+          "A": 80
+        },
+        "fin": {},
+        "bl": {}
+      }
+    ]
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 0,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-03-30": "NORMAL",
+      "2026-03-31": "NORMAL",
+      "2026-04-01": "PS_PRE_STOP",
+      "2026-04-02": "STOP",
+      "2026-04-03": "STOP",
+      "2026-04-04": "STOP",
+      "2026-04-05": "STOP",
+      "2026-04-06": "NORMAL",
+      "2026-04-07": "NORMAL",
+      "2026-04-08": "NORMAL",
+      "2026-04-09": "NORMAL",
+      "2026-04-10": "NORMAL"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/ps-early-drop.plan.json",
+      "why": "PS 在停前日之前就低于正常下限",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C8"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/ps-not-restored.plan.json",
+      "why": "短停复工即正常日，PS 当天须回到目标",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "C8"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

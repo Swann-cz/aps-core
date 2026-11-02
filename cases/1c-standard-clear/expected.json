@@ -1,0 +1,74 @@
+{
+  "case": "1c-standard-clear",
+  "spec": "CORE_MODEL §5 BS 清线行（停线前出清、清线零头放在清线前一天，rev 186–187）、PS 停前日行（停前降库，rev 185）",
+  "engine": {
+    "status": "FEASIBLE",
+    "compare": "none",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "stop_list": [
+      {
+        "start": "2026-03-07",
+        "end": "2026-03-22",
+        "length": 16,
+        "pre_stop_date": "2026-03-06",
+        "target": 91,
+        "source": "DEFAULT"
+      }
+    ],
+    "days": []
+  },
+  "judge_on_engine": {
+    "verdict": "ACCEPT",
+    "objective": {
+      "L1a": 0,
+      "L1b": 0,
+      "L1c": 0,
+      "L2": 1,
+      "L3a": 0,
+      "L3b": 0,
+      "L4": 0,
+      "L5": 0
+    },
+    "phases": {
+      "2026-03-04": "NORMAL",
+      "2026-03-05": "PS_PRE_STOP+BS_CLEAR",
+      "2026-03-06": "PS_PRE_STOP+BS_CLEAR",
+      "2026-03-07": "STOP",
+      "2026-03-08": "STOP"
+    }
+  },
+  "counter_plans": [
+    {
+      "file": "counter/tail-after-clear.plan.json",
+      "why": "焊装满产到清线，零头没放在清线前一天，停前日 PS 日末 95 未到 91",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "PS_PRE_STOP"
+        ]
+      },
+      "engine_must_differ": true
+    },
+    {
+      "file": "counter/hold-at-stop.plan.json",
+      "why": "清线前一天全线降到 76，停线时线上多 4 台未出清",
+      "judge": {
+        "verdict": "REJECT",
+        "rules": [
+          "BS_CLEAR",
+          "PS_PRE_STOP"
+        ]
+      },
+      "engine_must_differ": true
+    }
+  ]
+}

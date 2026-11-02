@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+cases/*/_out/
+.venv/
+tasks/logs/
+engine/_out/
+workspace/
+ui/node_modules/
+ui/dist/
+.claude/settings.local.json
+imports/
+release/
+judge/selftest/_out/
+tasks/redteam/

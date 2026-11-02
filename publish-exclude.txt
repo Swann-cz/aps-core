@@ -1,0 +1,11 @@
+# 发布快照时删除以下路径。
+# 本机仓库不受影响。
+cases/1d-annual-feedback/
+cases/t30-trial/
+cases/t32-half-year-switch/
+cases/t36-high-jph/
+cases/t38-retrofit/
+tasks/
+HANDOFF-GIT.md
+tools/dsh_run.sh
+tools/dsh-headless.patch.yml
