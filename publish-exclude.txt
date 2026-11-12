@@ -5,6 +5,7 @@ cases/t30-trial/
 cases/t32-half-year-switch/
 cases/t36-high-jph/
 cases/t38-retrofit/
+cases/t39-holiday/
 tasks/
 HANDOFF-GIT.md
 tools/dsh_run.sh

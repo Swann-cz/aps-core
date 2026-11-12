@@ -3,6 +3,7 @@ import argparse
 from copy import deepcopy
 from fractions import Fraction
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,9 +16,12 @@ from .conditions import prepare
 from .monthly import prebuild, prebuild_findings
 from .stop_plan import predict_stop
 from .segments import (initial_state, replay_template, expand_segments, prepare_fast,
-                       _schedule, _days, _resume, needs_clear, _level_settings, _settings)
+                       _schedule, _days, _resume, needs_clear, _level_settings, _settings, _pre_stop_ok)
 
 LEVELS = ("L1a", "L1b", "L1c", "L2", "L3a", "L3b")
+# GEN-3 本次双车型实测：公式窗口前后各 5 天，并保留月初前 2 个开工位置。
+CHANGEOVER_WINDOW = 5
+CHANGEOVER_EARLY = 2
 
 
 def solve_product(data, input_path, output_path):
@@ -28,12 +32,6 @@ def solve_product(data, input_path, output_path):
     errors, *_ = prepare(data, days)
     if errors:
         return result('INPUT_INVALID', errors)
-    answer = solve_segments(data)
-    print('segment_search_stats=' + json.dumps(answer['stats'], ensure_ascii=False), flush=True)
-    if 'plan' not in answer:
-        month = answer.get('blocked_month', '')
-        return result('UNKNOWN', [f'没有排出计划：{month} 月找不到同时满足全部规则的安排。请检查该月及前后月份的产能、停线和目标在制设置。',
-                                  *answer['findings']])
     output_path.parent.mkdir(parents=True, exist_ok=True)
     candidate_path = output_path.with_name(output_path.stem + '.segment-candidate.plan.json')
     verdict_path = output_path.with_name(output_path.stem + '.segment-candidate.verdict.json')
@@ -50,10 +48,12 @@ def solve_product(data, input_path, output_path):
                    == Fraction(str(values[k])) for k in LEVELS)
         return verdict
 
-    verdict = check(answer['plan'], answer['levels'])
-    if verdict['verdict'] != 'ACCEPT':
-        return result('EXECUTION_ERROR', ['段级排产结果没有通过复核（程序内部错误），请打包反馈给维护人员。',
-            *[f"{e['rule']}，{e['date']}：{e['detail']}" for e in verdict['hard_errors']]])
+    answer = solve_segments(data, accept=lambda plan, values: check(plan, values)['verdict'] == 'ACCEPT')
+    print('segment_search_stats=' + json.dumps(answer['stats'], ensure_ascii=False), flush=True)
+    if 'plan' not in answer:
+        month = answer.get('blocked_month', '')
+        return result('UNKNOWN', [f'没有排出计划：{month} 月找不到同时满足全部规则的安排。请检查该月及前后月份的产能、停线和目标在制设置。',
+                                  *answer['findings']])
     answer = improve_segments(data, answer,
         lambda plan, values: check(plan, values)['verdict'] == 'ACCEPT',
         crew_moves=True, combined_moves=True)
@@ -227,7 +227,7 @@ def _month_controls(data, entry, month, first, last, table, *, two_switches=Fals
     """§8/§9：从输入和可达入口生成端点，未读取任何参考计划。
 
     一个月至多两次换型为本轮有限候选域，不是业务段数约束；月界保留
-    物理状态、FIFO 和阶段记忆。所有可用日期都可作为换型端点。
+    物理状态、FIFO 和阶段记忆。单次换型按配额窗口选日，双换型保留全部日期。
     """
     settings = table['settings']
     models = list(data['factory']['models'])
@@ -358,6 +358,17 @@ def _month_controls(data, entry, month, first, last, table, *, two_switches=Fals
         hold = deepcopy(base)
         hold['tail']['hold_buffers'] = shape
         yield [hold]
+    capacity_prefix = [0]
+    for d in settings:
+        if first <= d <= last and settings[d]['caps'][line]:
+            capacity_prefix.append(capacity_prefix[-1] + settings[d]['caps'][line])
+    water = sum(v[current] for v in entry['stock'].values())
+    positions = []
+    for goal in limits[current]:
+        need = goal - entry['fok'][current] - water
+        positions.append(next((k for k, capacity in enumerate(capacity_prefix)
+                               if capacity >= need), len(capacity_prefix) - 1))
+    f_low, f_up = positions
     for other in models:
         # C12 允许预排下一月带内的量；旧车型需求不再增长时，
         # 提前清旧线并接新线，用 C16 的顺接流动消化旧车型在制。
@@ -376,15 +387,24 @@ def _month_controls(data, entry, month, first, last, table, *, two_switches=Fals
             if len(old_work) < count:
                 continue
             clear = old_work[-count] if count else before
+            keep_single = (f_low - CHANGEOVER_WINDOW <= len(old_work) <= f_up + CHANGEOVER_WINDOW
+                           or pos <= CHANGEOVER_EARLY or pos == len(work) - 1)
+            if not keep_single:
+                stats = table.get('_fragment_cache')
+                if stats is not None:
+                    stats['changeover_skipped'] += 1
+                if not two_switches:
+                    continue
             a = deepcopy(base)
             a.update(end=clear, next_start=work[pos], tail={'type': 'CHANGEOVER', 'clear_start': clear})
             b = deepcopy(base)
             b.update(model=other, start=work[pos])
-            yield [a, b]
-            for shape in hold_shapes(other):
-                held = deepcopy(b)
-                held['tail']['hold_buffers'] = shape
-                yield [a, held]
+            if keep_single:
+                yield [a, b]
+                for shape in hold_shapes(other):
+                    held = deepcopy(b)
+                    held['tail']['hold_buffers'] = shape
+                    yield [a, held]
             if not two_switches:
                 continue
             # §5 换型/B13、C16：第二次清线只能接在新线和全链补满后。
@@ -419,7 +439,145 @@ def _month_controls(data, entry, month, first, last, table, *, two_switches=Fals
                 yield [a, middle, final]
 
 
+def _fragment_json(value):
+    return json.dumps(value, sort_keys=True, separators=(',', ':'),
+                      default=lambda v: {'numerator': v.numerator, 'denominator': v.denominator})
+
+
+def _fragment_identity(data, first, last, controls, table):
+    # _schedule 的完整选日范围，包含跨月准备日、提前降库及 next_start 前的空闲日。
+    lower = min([first, *[min(c['start'], c['tail'].get('preparation_date', c['start']),
+        *[v['start'] for v in c['tail'].get('level_drains', {}).values()]) for c in controls]])
+    upper = max([last, *[min(data['horizon']['end'], (date.fromisoformat(
+        c['tail'].get('stop_window', {}).get('restart', c['next_start'])) - timedelta(days=1)).isoformat())
+        for c in controls]])
+    span = lower, upper
+    identities = table['_fragment_spans']
+    if span not in identities:
+        settings = table['settings']
+        local = {d: s for d, s in settings.items() if lower <= d <= upper}
+        # _idle_phases 在范围外只看是否有产能：最近非空闲日决定相接零流窗的长度。
+        before = next((d for d in reversed(settings) if d < lower and any(settings[d]['caps'].values())), None)
+        after = next((d for d in settings if d > upper and any(settings[d]['caps'].values())), None)
+        # needs_clear 可向前找到范围外最后一个焊装可生产日，只读取其本线能力。
+        weld_before = {}
+        for m, info in data['factory']['models'].items():
+            d = next((d for d in reversed(settings) if d < lower and settings[d]['caps'][info['line']]), None)
+            weld_before[m] = (d, settings[d]['caps'][info['line']] if d is not None else None)
+        # TODO(边界): stop_days/prebuild/level_authorization 保守保留整期，未按片段裁剪。
+        identity = _fragment_json({
+            **{k: table[k] for k in ('stop_days', 'prebuild', 'level_authorization')},
+            'settings': local, 'modes': {d: table['modes'].get(d, {}) for d in local},
+            'idle_neighbors': (before, after), 'weld_before': weld_before,
+            'rates': {m: {d: values[d] for d in local} for m, values in table['rates'].items()},
+            'prefix_steps': {m: {d: values[d] for d in local}
+                             for m, values in table['_fragment_prefix_steps'].items()}})
+        shared = table['_fragment_cache']['identities']
+        identities[span] = shared.setdefault(identity, len(shared))
+    return identities[span]
+
+
+class _FragmentSignature:
+    """记录旧事件/准备日表实际命中的表项，不改变其逐字段比较。"""
+    def __init__(self, item, record):
+        self.item, self.record = item, record
+
+    def __eq__(self, other):
+        matched = self.item['entry'] == other
+        if matched:
+            self.record['value'] = self.item
+        return matched
+
+
+class _FragmentEntries:
+    def __init__(self, entries, trace, kind, day=None):
+        self.entries, self.trace, self.kind, self.day = entries, trace, kind, day
+
+    def __iter__(self):
+        record = {'kind': self.kind, 'day': self.day, 'value': None}
+        self.trace.append(record)
+        for item in self.entries:
+            yield {**item, 'entry': _FragmentSignature(item, record)}
+
+    def append(self, item):
+        self.entries.append(item)
+        self.trace[-1]['value'] = item
+
+
+class _FragmentEvents:
+    def __init__(self, events, trace):
+        self.events, self.trace = events, trace
+
+    def get(self, day, default):
+        return _FragmentEntries(self.events.get(day, default), self.trace, 'event', day)
+
+    def setdefault(self, day, default):
+        return _FragmentEntries(self.events.setdefault(day, default), self.trace, 'event', day)
+
+
 def _run_fragment(data, entry, first, last, controls, table):
+    cache = table.get('_fragment_cache')
+    if cache is None:
+        return _compute_fragment(data, entry, first, last, controls, table)
+    entry_key = _fragment_json(entry)
+    key = (_fragment_identity(data, first, last, controls, table),
+           entry_key, _fragment_json(controls), first, last)
+    saved = cache['results'].setdefault(entry_key, {}).get(key)
+    if saved is not None:
+        cache['cache_hits'] += 1
+        edits, trace, result, error = saved
+        # 保留对原 control/tail 的写回，以及 controls[:] 替换的先后顺序。
+        for kind, value in edits:
+            if kind == 'replace':
+                controls[:] = deepcopy(value)
+            else:
+                index, end, drain = value
+                controls[index]['tail'].setdefault('level_drains', {})[end] = deepcopy(drain)
+        # 旧表也是计算缓存；复现填表效果，按本轮冷热状态还原 fast_stats。
+        for records in trace:
+            event_hits = 0
+            for record in records:
+                item = record['value']
+                if item is None:
+                    continue  # 日转移抛错且尚未写入事件表。
+                entries = (table['events'].setdefault(record['day'], []) if record['kind'] == 'event'
+                           else table.setdefault('preparations', []))
+                found = next((v for v in entries if v['entry'] == item['entry']), None)
+                if found is None:
+                    entries.append(item)
+                elif record['kind'] == 'event':
+                    event_hits += 1
+        if error is not None:
+            raise ValueError(error)
+        flow, schedule = result
+        # 只复制会更新的三个计数；已入图的边保留各自的统计对象。
+        stats = dict(flow['fast_stats'])
+        stats['event_hits'] = event_hits
+        stats['single_days'] = len(flow['days']) - stats['steady_days'] - event_hits
+        flow['fast_stats'] = stats
+        return flow, schedule
+    edits, trace = [], []
+    try:
+        result = _compute_fragment(data, entry, first, last, controls, table,
+                                   control_edits=edits, memo_trace=trace)
+    except ValueError as exc:
+        cache['results'][entry_key][key] = edits, trace, None, str(exc)
+        raise
+    # edits 已在写回发生时取快照；trace 只引用只读的精确事件/准备日表项。
+    cache['results'][entry_key][key] = edits, trace, result, None
+    return result
+
+
+def _compute_fragment(data, entry, first, last, controls, table, *, control_edits=None, memo_trace=None):
+    def replay(*args, **kwargs):
+        if memo_trace is not None:
+            table['_fragment_cache']['replays'] += 1
+            records = []
+            memo_trace.append(records)
+            kwargs['prepared'] = {**table, 'events': _FragmentEvents(table['events'], records),
+                'preparations': _FragmentEntries(table.setdefault('preparations', []), records, 'preparation')}
+        return replay_template(*args, **kwargs)
+
     schedule = _schedule(data, controls, table['settings'], level_days=table['stop_days'])
     authorization = table.get('level_authorization')
     if any('stop_forecast' in c['tail'] for c in controls) and authorization is None:
@@ -484,10 +642,13 @@ def _run_fragment(data, entry, first, last, controls, table):
                      for d in table['settings'] if c['clear_start'] <= d <= end}
             controls[index]['tail'].setdefault('level_drains', {})[end] = {
                 'start': c['clear_start'], 'modes': modes}
+            if control_edits is not None:
+                control_edits.append(('drain', (index, end,
+                    deepcopy(controls[index]['tail']['level_drains'][end]))))
             schedule = _schedule(data, controls, table['settings'], level_days=table['stop_days'])
         if forecast is None or not forecast['starts']:
             try:
-                probe = replay_template(data, entry, first, end, table['modes'], controls,
+                probe = replay(data, entry, first, end, table['modes'], controls,
                                         prepared=table, fast=True, schedule=schedule, fok_limits=limits)
                 if _applicable(data, entry, probe, schedule, table['settings'], table['prebuild']):
                     continue
@@ -508,7 +669,7 @@ def _run_fragment(data, entry, first, last, controls, table):
             trial[index]['tail'].setdefault('level_drains', {})[end] = {'start': start, 'modes': modes}
             trial_schedule = _schedule(data, trial, table['settings'], level_days=table['stop_days'])
             try:
-                probe = replay_template(data, entry, first, end, table['modes'], trial,
+                probe = replay(data, entry, first, end, table['modes'], trial,
                                         prepared=table, fast=True, schedule=trial_schedule, fok_limits=limits)
             except ValueError:
                 continue
@@ -517,11 +678,13 @@ def _run_fragment(data, entry, first, last, controls, table):
                 break
         if chosen is None:
             raise ValueError(f'{first}..{end}：未找到精确到人工停前水位的提前降库起点')
+        if control_edits is not None:
+            control_edits.append(('replace', deepcopy(chosen[0])))
         controls[:], schedule = chosen
     for d in _days(first, last):
         if d not in schedule:
             schedule[d] = {'model': controls[0]['model'], 'segment': 0, 'kind': 'IDLE', 'retain_water': False}
-    flow = replay_template(data, entry, first, last, table['modes'], controls,
+    flow = replay(data, entry, first, last, table['modes'], controls,
                            prepared=table, fast=True, schedule=schedule)
     return flow, schedule
 
@@ -605,10 +768,7 @@ def _cap_candidate(data, entry, month, first, last, controls, table, flow, sched
             data['factory']['models'][m]['line'], 'PS', 'AS_MAIN', 'AS_FIN'))
         if excess > capacity:
             return None
-        # 尾差量与模板 FOK 有水位/停前关系；在完整整数区间找最大的合法值。
-        low, high, chosen = 0, capacity, None
-        while low <= high:
-            q = (low + high) // 2
+        def replay(q):
             trial = deepcopy(controls)
             index = schedule[d]['segment']
             if 'hold' in schedule[d]:
@@ -618,11 +778,42 @@ def _cap_candidate(data, entry, month, first, last, controls, table, flow, sched
                 # C14 普通尾差必须成为真实段末，不能在清线准备日前另插尾差。
                 trial[index]['stop_points'][month] = {'date': d, 'quantity': q}
             f, s = _run_fragment(data, entry, first, last, trial, table)
+            return trial, f, s
+
+        guess = max(0, min(capacity, capacity - excess))
+        chosen = None
+        try:
+            trial, f, s = replay(guess)
             if f['exit']['fok'][m] <= upper:
                 chosen = trial, f, s
-                low = q + 1
+                if guess < capacity:
+                    _, next_flow, _ = replay(guess + 1)
+                    if next_flow['exit']['fok'][m] <= upper:
+                        chosen = None
+        except ValueError:
+            # 预测回放未成立时，仍由原二分路径决定该候选的结果。
+            chosen = None
+        stats = table.get('_fragment_cache')
+        if stats is not None:
+            stats['cap_guess_hits' if chosen is not None else 'cap_fallbacks'] += 1
+        if chosen is None or os.environ.get('APS_CAP_CHECK') == '1':
+            # 水位/停前阶段可能随 q 改变；保留原区间、访问顺序和判定。
+            low, high, binary_chosen, binary_q = 0, capacity, None, None
+            while low <= high:
+                q = (low + high) // 2
+                trial, f, s = replay(q)
+                if f['exit']['fok'][m] <= upper:
+                    binary_chosen, binary_q = (trial, f, s), q
+                    low = q + 1
+                else:
+                    high = q - 1
+            if chosen is not None:
+                if guess != binary_q:
+                    message = f'APS_CAP_CHECK month={month} model={m} guess={guess} binary={binary_q}'
+                    print(message, flush=True)
+                    raise AssertionError(message)
             else:
-                high = q - 1
+                chosen = binary_chosen
         if chosen is None:
             return None
         controls, flow, schedule = chosen
@@ -641,6 +832,11 @@ def _applicable(data, entry, flow, schedule, settings, early=None):
     stop_windows = [s for s in stop_windows if any(c['type'] == 'SHUTDOWN'
         and set(c.get('workshops', data['factory']['workshops'])) == set(data['factory']['workshops'])
         and s['pre_stop'] < c['start'] <= c['end'] < s['restart'] for c in data['conditions'])]
+    # C13 清线后保持本来就允许空闲；不能依赖停线日误带 REFILL 标签才接纳。
+    stop_windows += [{'pre_stop': d, 'restart': c['clear_restart']}
+                     for d, c in schedule.items() if c['kind'] == 'BS_CLEAR' and d == c['clear_end']]
+    stop_windows += [p['stop_window'] for p in entry['pending_phases']
+                     if p['type'] == 'REFILL' and p.get('waiting') and 'stop_window' in p]
     # §5 rev 205：以实际连续低于正常目标的日末反推起点，不能凭候选标签免 C14。
     level_days, level_windows = {}, []
     for end, c in schedule.items():
@@ -683,9 +879,9 @@ def _applicable(data, entry, flow, schedule, settings, early=None):
         if 'pre_stop' in c and not any(sum(row['workshops']['PS'][k].values()) for k in ('in', 'out')):
             # §5：停前日是实际最后一个 PS 生产日，不能靠标签把零流日当停前日。
             return False
-        if 'pre_stop' in c and sum(row['eod']['PS'].values()) != c['pre_stop']:
+        if 'pre_stop' in c and not _pre_stop_ok(row, 'PS', c['pre_stop'], settings[d]['targets']['PS']):
             return False
-        if 'pre_stop' in c and any(sum(row['eod'][n].values()) != value
+        if 'pre_stop' in c and any(not _pre_stop_ok(row, n, value, settings[d]['targets'][n])
                                   for n, value in c.get('stop_levels', {}).items()):
             return False
         if c['kind'] == 'PREPARE' and 'BS_CLEAR' not in row['phase']:
@@ -696,20 +892,22 @@ def _applicable(data, entry, flow, schedule, settings, early=None):
         if c['kind'] == 'BS_CLEAR' and d == c['clear_end']:
             line = data['factory']['models'][c['model']]['line']
             final = {**settings[d]['targets'], **c.get('drain_levels', {}), line: 0, 'WBS': 0}
-            if any(sum(row['eod'][n].values()) != final[n]
-                   for n in (line, 'WBS', 'PS', 'PBS', 'AS_MAIN', 'AS_FIN')):
+            if (any(sum(row['eod'][n].values()) != 0 for n in (line, 'WBS'))
+                    or any(not _pre_stop_ok(row, n, final[n], settings[d]['targets'][n])
+                           for n in ('PS', 'PBS', 'AS_MAIN', 'AS_FIN'))):
                 return False
-        # TODO(边界): 停前人工水位要求升库时不支持；无清线仅停前日降库，达不到即淘汰。
         levels = dict(lowering)
         if c['kind'] != 'PREPARE' or 'BS_CLEAR' in row['phase']:
             levels.update(c.get('drain_levels', {}))
         for n, value in levels.items():
-            if not value <= sum(row['eod'][n].values()) <= sum(row['bod'][n].values()):
+            incoming = row['workshops']['PS']['out'] if n == 'PBS' else row['workshops'][n]['in']
+            available = sum(row['bod'][n].values()) + sum(incoming.values())
+            if sum(row['eod'][n].values()) < min(value, settings[d]['targets'][n], available):
                 return False
             if n in ('AS_MAIN', 'AS_FIN'):
                 shop = row['workshops'][n]
-                want = min(settings[d]['caps'][n], sum(row['bod'][n].values())
-                           + sum(shop['in'].values()) - value)
+                want = min(settings[d]['caps'][n], max(0, sum(row['bod'][n].values())
+                           + sum(shop['in'].values()) - value))
                 if sum(shop['out'].values()) != want:
                     return False
         # rev 205 / 第 4 轮：清线前主线投入按 PBS 实际可供量做尽，不按 C14 判满产。
@@ -719,8 +917,11 @@ def _applicable(data, entry, flow, schedule, settings, early=None):
             shop = row['workshops']['AS_MAIN']
             cap = settings[d]['caps']['AS_MAIN'] if shop['mode'] != 'OFF' else 0
             keep = lowering.get('PBS', settings[d]['targets']['PBS'])
-            want = min(cap, sum(row['bod']['PBS'].values())
-                       + sum(row['workshops']['PS']['out'].values()) - keep)
+            keep = max(keep, next(values.get('PBS', settings[d]['targets']['PBS'])
+                for end, clear, starts, values in level_windows if d < clear and d <= end
+                and any(starts.get(n, end) <= d for n in ('PBS', 'AS_MAIN') if n in values)))
+            want = min(cap, max(0, sum(row['bod']['PBS'].values())
+                       + sum(row['workshops']['PS']['out'].values()) - keep))
             if sum(shop['in'].values()) != want:
                 return False
         # C3：IDLE 也是候选的真实零流，不能越过指定产量固定点。
@@ -809,21 +1010,22 @@ def _applicable(data, entry, flow, schedule, settings, early=None):
                 shop = r['workshops'][w]
                 cap = settings[r['date']]['caps'][w] if shop['mode'] != 'OFF' else 0
                 out = sum(shop['out'].values())
-                want = min(cap, sum(r['bod'][w].values()) + sum(shop['in'].values())
-                           - values[w])
+                want = min(cap, max(0, sum(r['bod'][w].values()) + sum(shop['in'].values())
+                           - values[w]))
                 if out != want or partial and out >= cap > 0:
                     return False
                 partial = partial or out < cap
     return all(done[m] <= upper for m, (_, upper) in limits[flow['days'][-1]['date'][:7]].items())
 
 
-def solve_segments(data, *, beam_width=8, deterministic_seconds=0.1):
+def solve_segments(data, *, beam_width=8, deterministic_seconds=0.1, accept=None):
     """C12：两种上限分域保留月度束，共用一次年度图比较。"""
     return _solve_segments(data, prebuild(data), beam_width=beam_width,
-                           deterministic_seconds=deterministic_seconds)
+                           deterministic_seconds=deterministic_seconds, accept=accept)
 
 
-def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _two_switch_months=()):
+def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _two_switch_months=(), accept=None,
+                    _resume=None):
     """§8：精确可达片段图 + 六级年度路径选择，受限搜索。"""
     tick = perf_counter()
     tables = _tables(data, early)
@@ -851,6 +1053,16 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
     for table in tables:
         table['level_authorization'] = authorization
         table['stop_default'], table['stop_high'] = default_settings, high_settings
+    fragment_cache = {'results': {}, 'identities': {}, 'replays': 0, 'cache_hits': 0,
+                      'cap_guess_hits': 0, 'cap_fallbacks': 0, 'changeover_skipped': 0}
+    for table in tables:
+        table['_fragment_cache'] = fragment_cache
+        table['_fragment_spans'], table['_fragment_prefix_steps'] = {}, {}
+        for m, values in table['prefixes'].items():
+            previous, steps = 0, {}
+            for d, value in values.items():
+                steps[d], previous = value - previous, value
+            table['_fragment_prefix_steps'][m] = steps
     months = sorted({d[:7] for d in dates})
     root = initial_state(data)
     empty_stops = _stop_dates(data, {}, dates[0], dates[-1])
@@ -861,7 +1073,46 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
     widened = []
     samples = []
     ratio = Fraction(str(data['rules']['monthly_band_ratio']))
+    first_start_returns = {}
+    snapshots = {}
+    if _resume is not None:
+        snapshots = _resume['snapshots']
+        snapshot = snapshots[_resume['month']]
+        nodes, edges = _resume['nodes'], _resume['edges']
+        frontier = snapshot['frontier'].copy()
+        ordinary_frontier = snapshot['ordinary_frontier'].copy()
+        attempts = snapshot['attempts']
+        failures, widened = _resume['failures'], _resume['widened']
+        samples = snapshot['samples'].copy()
+        first_start_returns = snapshot['first_start_returns'].copy()
+        fragment_cache.update(snapshot['fragment_stats'])
     for month in months:
+        if _resume is not None and month < _resume['month']:
+            continue
+        # 保留月初标签和追加列表的长度；后续展开仍可能回到更早的月份。
+        snapshots[month] = {
+            'nodes': len(nodes), 'edges': len(edges), 'frontier': frontier.copy(),
+            'ordinary_frontier': ordinary_frontier.copy(), 'attempts': attempts,
+            'failures': len(failures), 'widened': len(widened), 'samples': samples.copy(),
+            'first_start_returns': first_start_returns.copy(),
+            'fragment_stats': {k: v for k, v in fragment_cache.items()
+                               if k not in ('results', 'identities')}}
+        # C12：首次启动车型插入后，旧车型的月度上限加链上余量仍不足
+        # 全年 PR，才需要保留换回旧线的路线；不以欠产本身触发展开。
+        limits = _limits(data, month, early)
+        for m, pr in data['demand']['PR'].items():
+            if (not pr[month] or any(v.get(m, 0) for v in data['initial']['wip'].values())
+                    or any(m in nodes[n]['state']['started_models']
+                           or nodes[n]['state']['fok'][m]
+                           or m in (nodes[n]['state']['current_model'], nodes[n]['state']['previous_model'])
+                           for n in frontier)):
+                continue
+            for old, demand in data['demand']['PR'].items():
+                if (old != m and any(q for mo, q in demand.items() if mo > month)
+                        and all(old in nodes[n]['state']['started_models']
+                            and limits[old][1] + sum(v[old] for v in nodes[n]['state']['stock'].values())
+                                < sum(demand.values()) for n in frontier)):
+                    first_start_returns.setdefault((m, old), month)
         local_days = [d for d in dates if d[:7] == month]
         first, last = local_days[0], local_days[-1]
         next_frontier = []
@@ -873,7 +1124,10 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
                     break
                 widened.extend(f'{d} 停线：预判范围内没有合法排法，已放宽搜索'
                                for d, _ in sorted(fallback_stops))
-            for parent in frontier:
+            entry_keys = [_fragment_json(nodes[parent]['state']) for parent in frontier]
+            last_parent = {key: position for position, key in enumerate(entry_keys)}
+            for position, parent in enumerate(frontier):
+                entry_key = entry_keys[position]
                 entry = nodes[parent]['state']
                 for table_index, table in enumerate(tables):
                     if table['band'] == 'ordinary' and parent not in ordinary_frontier:
@@ -959,16 +1213,28 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
                                                   'not_before': not_before, 'stop_dates': stop_dates,
                                                   'ordinary': ordinary_path})
                                     edges.append({'from': parent, 'to': child, 'flow': f, 'schedule': s,
+                                        'fast_stats': f['fast_stats'],
                                         'controls': selected_controls, 'table': table_index, 'cost': increments,
                                         'stop_dates': _stop_dates(data, s, first, last)})
                                     next_frontier.append(child)
                         except ValueError as exc:
                             # 模板情形未覆盖是显式拒绝候选，不把受限找不到当输入不可行。
                             failures.append(str(exc))
+                if position == last_parent[entry_key]:
+                    fragment_cache['results'].pop(entry_key, None)
+            fragment_cache['results'].clear()
         ordinary_blocked = (any(t['band'] == 'ordinary' for t in tables)
             and any(nodes[n]['ordinary'] for n in frontier)
             and not any(nodes[n]['ordinary'] for n in next_frontier))
-        if not next_frontier or ordinary_blocked:
+        # 先让下一月的普通单换型尝试接回旧线。已有返回路线就不扩展，
+        # 避免已有跨月顺接路线重复生成日期对。
+        first_start_blocked = next((start for (m, old), start in first_start_returns.items()
+            if months.index(month) == months.index(start) + 1
+            and not any(m in nodes[n]['state']['started_models']
+                        and nodes[n]['state']['current_model'] == old for n in next_frontier)
+            and any(mo not in _two_switch_months
+                    for mo in months[months.index(start):months.index(start) + 2])), None)
+        if not next_frontier or ordinary_blocked or first_start_blocked is not None:
             # C12/C16：给出入口中可直接复查的换型卡点，不把它当无解证明。
             for parent in frontier:
                 state = nodes[parent]['state']
@@ -980,14 +1246,27 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
                         failures.append(f"{month} 换型时 {m} 车型链上还有 {water} 台在制，"
                             f"累计已完成 {state['fok'][m]} 台，全部流出会超过累计需求带上限 {upper} 台。")
             # 按可达图的阻塞月份向前展开双换型候选，避免无关月份的日期对乘积。
-            expand = next((mo for mo in reversed(months[:months.index(month) + 1])
-                           if mo not in _two_switch_months), None)
+            if next_frontier and not ordinary_blocked and first_start_blocked is not None:
+                # 首次启动只展开启动月及其下月，不回溯其他月份。
+                start = months.index(first_start_blocked)
+                expand = next(mo for mo in months[start:start + 2] if mo not in _two_switch_months)
+            else:
+                expand = next((mo for mo in reversed(months[:months.index(month) + 1])
+                               if mo not in _two_switch_months), None)
             if expand is not None and len(data['factory']['models']) > 1:
                 generation_seconds = perf_counter() - tick
+                fragment_cache['results'].clear()  # 续算新建计算缓存，不叠加前一轮片段缓存内存。
+                snapshot = snapshots[expand]
                 answer = _solve_segments(data, early, beam_width=beam_width,
-                    deterministic_seconds=deterministic_seconds,
-                    _two_switch_months=(*_two_switch_months, expand))
+                    deterministic_seconds=deterministic_seconds, accept=accept,
+                    _two_switch_months=(*_two_switch_months, expand),
+                    _resume={'month': expand,
+                        'snapshots': {mo: s for mo, s in snapshots.items() if mo <= expand},
+                        'nodes': nodes[:snapshot['nodes']], 'edges': edges[:snapshot['edges']],
+                        'failures': failures[:snapshot['failures']],
+                        'widened': widened[:snapshot['widened']]})
                 answer['stats']['generation_seconds'] += generation_seconds
+                answer['stats']['resumed_months'].insert(0, months.index(expand))
                 notices = list(dict.fromkeys([*widened, *answer.get('stop_search_findings', [])]))
                 answer['stop_search_findings'] = notices
                 answer['findings'] = list(dict.fromkeys([*notices, *answer['findings']]))
@@ -998,7 +1277,13 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
                 return {'status': 'UNKNOWN', 'scope': 'restricted_fragment_graph', 'segments': [],
                     'findings': list(dict.fromkeys([*widened, *failures])), 'blocked_month': month,
                     'blocked_entries': [nodes[n]['state'] for n in frontier],
-                    'stats': {'attempts': attempts, 'candidates': len(edges), 'generation_seconds': perf_counter() - tick}}
+                    'stats': {'attempts': attempts, 'replays': fragment_cache['replays'],
+                              'cache_hits': fragment_cache['cache_hits'],
+                              'cap_guess_hits': fragment_cache['cap_guess_hits'],
+                              'cap_fallbacks': fragment_cache['cap_fallbacks'],
+                              'changeover_skipped': fragment_cache['changeover_skipped'],
+                              'candidates': len(edges), 'generation_seconds': perf_counter() - tick,
+                              'resumed_months': []}}
         # 搜索宽度是计算预算；保留精确整数，不合并不同水位/FIFO/累计量。
         next_frontier.sort(key=lambda n: (-sum(nodes[n]['state']['fok'].values()),
             *nodes[n]['cost'][:2], tuple(-d for d in nodes[n]['stop_dates']), *nodes[n]['cost'][2:], n))
@@ -1094,91 +1379,108 @@ def _solve_segments(data, early, *, beam_width=8, deterministic_seconds=0.1, _tw
     objectives = [total_pr - sum(choose[i] * sum(e['flow']['production'].values()) for i, e in enumerate(edges))]
     objectives.extend(sum(choose[i] * int(e['cost'][k] * (denominator if k == 1 else 1))
                           for i, e in enumerate(edges)) for k in range(len(nodes[0]['cost'])))
-    logs, selected = [], None
-    solve_tick = perf_counter()
-    for level, objective in zip(LEVELS, objectives):
-        model.minimize(objective)
-        solver = cp_model.CpSolver()
-        solver.parameters.random_seed = 0
-        solver.parameters.num_workers = 1
-        solver.parameters.max_deterministic_time = deterministic_seconds
-        start = perf_counter()
-        status = solver.solve(model)
-        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-            selected = [i for i, x in enumerate(choose) if solver.value(x)]
-            value = solver.value(objective)
-        elif selected is not None:
-            value = (total_pr - sum(sum(edges[i]['flow']['production'].values()) for i in selected)
-                     if level == 'L1a' else sum(int(edges[i]['cost'][LEVELS.index(level) - 1]
-                         * (denominator if level == 'L1c' else 1)) for i in selected))
-        else:
-            return {'status': 'UNKNOWN', 'scope': 'restricted_fragment_graph', 'segments': [],
-                'findings': [*dict.fromkeys(widened), '全年方案比较没有在时限内完成。'],
-                'stop_search_findings': list(dict.fromkeys(widened)),
-                'stats': {'candidates': len(edges), 'generation_seconds': generation_seconds}}
-        model.add(objective == value)
-        logs.append({'level': level, 'value': value / denominator if level == 'L1c' else value,
-                     'candidate_table_optimal': status == cp_model.OPTIMAL, 'proven_optimal': False,
-                     'budget_deterministic_seconds': deterministic_seconds,
-                     'deterministic_seconds': solver.response_proto.deterministic_time,
-                     'seconds': perf_counter() - start, 'status': solver.status_name(status)})
-        if level == 'L1c':
-            # 第 5 轮：固定前三项目标后逐次择晚，不改计划的九级目标定义。
-            for pos in range(len(empty_stops)):
-                latest = sum(choose[i] * e['stop_dates'][pos] for i, e in enumerate(edges))
-                model.maximize(latest)
-                status = solver.solve(model)
-                if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-                    selected = [i for i, x in enumerate(choose) if solver.value(x)]
-                    value = solver.value(latest)
-                else:
-                    value = sum(edges[i]['stop_dates'][pos] for i in selected)
-                model.add(latest == value)
-    solve_seconds = perf_counter() - solve_tick
-    selected.sort(key=lambda i: edges[i]['flow']['days'][0]['date'])
-    combined_schedule, modes, segments = {}, {}, []
-    state, rows, events, monthly, l3a, l3b = root, [], [], {}, 0, 0
-    stats = {'steady_days': 0, 'event_hits': 0, 'single_days': 0}
-    for i in selected:
-        e = edges[i]
-        assert nodes[e['from']]['state'] == state
-        fragment = e['flow']
-        for r in fragment['days']:
-            d = r['date']
-            combined_schedule[d] = e['schedule'][d]
-            modes[d] = {**tables[e['table']]['modes'][d], **e['schedule'][d].get('level_modes', {})}
-        rows.extend(fragment['days'])
-        events.extend(fragment['events'])
-        monthly.update(fragment['monthly_fok'])
-        state = fragment['exit']
-        l3a += fragment['L3a']
-        l3b += fragment['L3b']
-        segments.extend(e['controls'])
-        for k in stats:
-            stats[k] += fragment['fast_stats'][k]
-    flow = {'days': rows, 'exit': state, 'events': events, 'monthly_fok': monthly,
-            'production': dict(state['fok']), 'L3a': l3a, 'L3b': l3b, 'fast_stats': stats}
-    # 最终选择用完整模板从期初再走一遍；不能以片段各自可行代替拼接核对。
-    verified = replay_template(data, root, dates[0], dates[-1], modes, segments, schedule=combined_schedule)
-    assert all(flow[k] == verified[k] for k in ('days', 'exit', 'events', 'monthly_fok', 'production', 'L3a', 'L3b'))
-    plan = expand_segments(data, segments, replay=verified)
-    values = measure(data, verified)
-    assert values == {r['level']: r['value'] for r in logs}
-    plan['objective']['levels'] = [{k: row[k] for k in ('level', 'value', 'proven_optimal', 'candidate_table_optimal')} for row in logs]
-    plan['findings'] = ['本计划由段级解法排出：按月比较不同的停线日期和换型日期（每月最多两次换型）后取最好的方案，不保证是理论最优。',
-                        *dict.fromkeys(widened), *prebuild_findings(data, plan['days'])]
-    return {'status': 'CANDIDATE', 'scope': 'restricted_fragment_graph', 'segments': segments,
-            'levels': values, 'flow': flow, 'plan': plan, 'solver': logs,
-            'schedule': combined_schedule, 'modes': modes,
-            'stats': {'attempts': attempts, 'candidates': len(edges), 'generated_fragments': len(nodes) - 1,
-                      'generation_seconds': generation_seconds, 'solve_seconds': solve_seconds,
-                      'model_build_seconds': solve_tick - tick - generation_seconds,
-                      'expand_seconds': perf_counter() - solve_tick - solve_seconds,
-                      'beam_width': beam_width, 'selected_fragments': len(selected),
-                      'sample_months_checked': samples,
-                      'selected_days': stats, 'full_replay_equal': True},
-            'findings': list(dict.fromkeys([*widened, *failures])),
-            'stop_search_findings': list(dict.fromkeys(widened))}
+    remaining = model
+    while True:
+        model = remaining.clone()
+        logs, selected = [], None
+        solve_tick = perf_counter()
+        for level, objective in zip(LEVELS, objectives):
+            model.minimize(objective)
+            solver = cp_model.CpSolver()
+            solver.parameters.random_seed = 0
+            solver.parameters.num_workers = 1
+            solver.parameters.max_deterministic_time = deterministic_seconds
+            start = perf_counter()
+            status = solver.solve(model)
+            if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                selected = [i for i, x in enumerate(choose) if solver.value(x)]
+                value = solver.value(objective)
+            elif selected is not None:
+                value = (total_pr - sum(sum(edges[i]['flow']['production'].values()) for i in selected)
+                         if level == 'L1a' else sum(int(edges[i]['cost'][LEVELS.index(level) - 1]
+                             * (denominator if level == 'L1c' else 1)) for i in selected))
+            else:
+                return {'status': 'UNKNOWN', 'scope': 'restricted_fragment_graph', 'segments': [],
+                    'findings': [*dict.fromkeys(widened), '没有找到满足全部规则的全年计划：候选已用尽或比较尚未完成。'],
+                    'stop_search_findings': list(dict.fromkeys(widened)),
+                    'stats': {'replays': fragment_cache['replays'], 'cache_hits': fragment_cache['cache_hits'],
+                              'cap_guess_hits': fragment_cache['cap_guess_hits'],
+                              'cap_fallbacks': fragment_cache['cap_fallbacks'],
+                              'changeover_skipped': fragment_cache['changeover_skipped'],
+                              'candidates': len(edges), 'generation_seconds': generation_seconds,
+                              'resumed_months': []}}
+            model.add(objective == value)
+            logs.append({'level': level, 'value': value / denominator if level == 'L1c' else value,
+                         'candidate_table_optimal': status == cp_model.OPTIMAL, 'proven_optimal': False,
+                         'budget_deterministic_seconds': deterministic_seconds,
+                         'deterministic_seconds': solver.response_proto.deterministic_time,
+                         'seconds': perf_counter() - start, 'status': solver.status_name(status)})
+            if level == 'L1c':
+                # 第 5 轮：固定前三项目标后逐次择晚，不改计划的九级目标定义。
+                for pos in range(len(empty_stops)):
+                    latest = sum(choose[i] * e['stop_dates'][pos] for i, e in enumerate(edges))
+                    model.maximize(latest)
+                    status = solver.solve(model)
+                    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                        selected = [i for i, x in enumerate(choose) if solver.value(x)]
+                        value = solver.value(latest)
+                    else:
+                        value = sum(edges[i]['stop_dates'][pos] for i in selected)
+                    model.add(latest == value)
+        solve_seconds = perf_counter() - solve_tick
+        selected.sort(key=lambda i: edges[i]['flow']['days'][0]['date'])
+        combined_schedule, modes, segments = {}, {}, []
+        state, rows, events, monthly, l3a, l3b = root, [], [], {}, 0, 0
+        stats = {'steady_days': 0, 'event_hits': 0, 'single_days': 0}
+        for i in selected:
+            e = edges[i]
+            assert nodes[e['from']]['state'] == state
+            fragment = e['flow']
+            for r in fragment['days']:
+                d = r['date']
+                combined_schedule[d] = e['schedule'][d]
+                modes[d] = {**tables[e['table']]['modes'][d], **e['schedule'][d].get('level_modes', {})}
+            rows.extend(fragment['days'])
+            events.extend(fragment['events'])
+            monthly.update(fragment['monthly_fok'])
+            state = fragment['exit']
+            l3a += fragment['L3a']
+            l3b += fragment['L3b']
+            segments.extend(e['controls'])
+            for k in stats:
+                stats[k] += e['fast_stats'][k]
+        flow = {'days': rows, 'exit': state, 'events': events, 'monthly_fok': monthly,
+                'production': dict(state['fok']), 'L3a': l3a, 'L3b': l3b, 'fast_stats': stats}
+        # 最终选择用完整模板从期初再走一遍；不能以片段各自可行代替拼接核对。
+        verified = replay_template(data, root, dates[0], dates[-1], modes, segments, schedule=combined_schedule)
+        assert all(flow[k] == verified[k] for k in ('days', 'exit', 'events', 'monthly_fok', 'production', 'L3a', 'L3b'))
+        plan = expand_segments(data, segments, replay=verified)
+        values = measure(data, verified)
+        assert values == {r['level']: r['value'] for r in logs}
+        plan['objective']['levels'] = [{k: row[k] for k in ('level', 'value', 'proven_optimal', 'candidate_table_optimal')} for row in logs]
+        plan['findings'] = ['本计划由段级解法排出：按月比较不同的停线日期和换型日期（每月最多两次换型）后取最好的方案，不保证是理论最优。',
+                            *dict.fromkeys(widened), *prebuild_findings(data, plan['days'])]
+        answer = {'status': 'CANDIDATE', 'scope': 'restricted_fragment_graph', 'segments': segments,
+                'levels': values, 'flow': flow, 'plan': plan, 'solver': logs,
+                'schedule': combined_schedule, 'modes': modes,
+                'stats': {'attempts': attempts, 'candidates': len(edges), 'generated_fragments': len(nodes) - 1,
+                          'replays': fragment_cache['replays'], 'cache_hits': fragment_cache['cache_hits'],
+                          'cap_guess_hits': fragment_cache['cap_guess_hits'],
+                          'cap_fallbacks': fragment_cache['cap_fallbacks'],
+                          'changeover_skipped': fragment_cache['changeover_skipped'],
+                          'generation_seconds': generation_seconds, 'solve_seconds': solve_seconds,
+                          'resumed_months': [],
+                          'model_build_seconds': solve_tick - tick - generation_seconds,
+                          'expand_seconds': perf_counter() - solve_tick - solve_seconds,
+                          'beam_width': beam_width, 'selected_fragments': len(selected),
+                          'sample_months_checked': samples,
+                          'selected_days': stats, 'full_replay_equal': True},
+                'findings': list(dict.fromkeys([*widened, *failures])),
+                'stop_search_findings': list(dict.fromkeys(widened))}
+
+        if accept is None or accept(plan, values):
+            return answer
+        remaining.add(sum(choose[i] for i in selected) < len(selected))
 
 
 def _shift_points(data, base, settings, early=None):
@@ -1255,7 +1557,7 @@ def _shift_cap(data, entry, month, first, last, controls, table, flow, schedule,
     capped = _cap_candidate(data, entry, month, first, last, controls, table, flow, schedule,
                             models=(moved_model,))
     if capped is not None and any('pre_stop' in capped[2].get(r['date'], {})
-            and sum(r['eod']['PS'].values()) != capped[2][r['date']]['pre_stop']
+            and not _pre_stop_ok(r, 'PS', capped[2][r['date']]['pre_stop'], table['settings'][r['date']]['targets']['PS'])
             for r in capped[1]['days']):
         capped = None
     if flow['exit']['fok'][moved_model] <= _limits(data, month, table['prebuild'])[moved_model][1]:
@@ -1283,7 +1585,7 @@ def _shift_cap(data, entry, month, first, last, controls, table, flow, schedule,
         capped = _cap_candidate(data, entry, month, first, last, changed, table, f, s,
                                 models=(moved_model,))
         if capped is not None and all('pre_stop' not in capped[2].get(r['date'], {})
-                or sum(r['eod']['PS'].values()) == capped[2][r['date']]['pre_stop']
+                or _pre_stop_ok(r, 'PS', capped[2][r['date']]['pre_stop'], table['settings'][r['date']]['targets']['PS'])
                 for r in capped[1]['days']):
             return capped
     return None
@@ -1295,12 +1597,13 @@ def _shift_replay(data, base, edits, moved_model, table, *, crew_edits=()):
     累计 FOK/net 不参与物理模板；复用日流量时精确更新欠交和出口账。
     遇 C10/C12 上限，仅给挪移车型选后续显式尾差，不动其他车型控制。
     """
-    segments = deepcopy(base['segments'])
+    segments = list(base['segments'])
     moved_models = moved_model if crew_edits else (moved_model,)
     for index, control in crew_edits:
         segments[index] = deepcopy(control)
     for index, month, point in edits:
-        s = segments[index]
+        s = {**segments[index], 'stop_points': dict(segments[index]['stop_points'])}
+        segments[index] = s
         s['stop_points'][month] = dict(point)
         if s['tail']['type'] != 'CHANGEOVER':
             s['end'] = max(p['date'] for p in s['stop_points'].values())
@@ -1330,17 +1633,23 @@ def _shift_replay(data, base, edits, moved_model, table, *, crew_edits=()):
                     c['stop_points'][month].pop('quantity', None)
         physical_equal = all(entry[k] == old_entry[k] for k in entry if k not in ('fok', 'net'))
         if month < first_changed or controls == old_controls and physical_equal:
-            f = deepcopy(old)
             delta = {m: entry['fok'][m] - old_entry['fok'][m] for m in entry['fok']}
-            for row in f['days']:
-                for m in delta:
-                    net = row['fin'][m] - row['bl'][m] + delta[m]
-                    row['fin'][m], row['bl'][m] = max(0, net), max(0, -net)
-            for k in ('fok', 'net'):
-                f['exit'][k] = {m: old['exit'][k][m] + delta[m] for m in delta}
+            f = old
+            if any(delta.values()):
+                f = {**old, 'days': [], 'exit': dict(old['exit'])}
+                for row in old['days']:
+                    adjusted = {**row, 'fin': dict(row['fin']), 'bl': dict(row['bl'])}
+                    for m in delta:
+                        net = row['fin'][m] - row['bl'][m] + delta[m]
+                        adjusted['fin'][m], adjusted['bl'][m] = max(0, net), max(0, -net)
+                    f['days'].append(adjusted)
+                for k in ('fok', 'net'):
+                    f['exit'][k] = {m: old['exit'][k][m] + delta[m] for m in delta}
             s = base['month_schedules'][month]
             reused.append(month)
         else:
+            # _run_fragment 会写回 tail.level_drains，只在重算前隔离本月控制段。
+            controls = deepcopy(controls)
             f, s = _run_fragment(data, entry, first, last, controls, table)
             recalculated.append(month)
         for m in moved_models:

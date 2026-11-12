@@ -1,4 +1,4 @@
-"""IMPORT_TEMPLATE v1.9：完整工作簿下载与预检。"""
+"""IMPORT_TEMPLATE v1.10：完整工作簿下载与预检。"""
 
 from datetime import date, datetime, timedelta
 from io import BytesIO
@@ -32,8 +32,8 @@ TYPES = dict(zip(("周六授权", "加班模式授权", "计划停线", "产能�
 RULES = {
     "停线最短天数": ("ps_stop_min_days", 3, "涂装连续停几天以上算停线"),
     "长停线天数": ("ps_long_stop_days", 15, "停线达到几天算长停线"),
-    "短停线停前目标": ("ps_pre_stop_target_short", 131, "短停线前一天涂装降到的台数"),
-    "长停线停前目标": ("ps_pre_stop_target_long", 91, "长停线前一天涂装降到的台数"),
+    "短停线停前目标": ("ps_pre_stop_target_short", 131, "短停线前一天涂装最多留的台数"),
+    "长停线停前目标": ("ps_pre_stop_target_long", 91, "长停线前一天涂装最多留的台数"),
     "月度带比例": ("monthly_band_ratio", 0.1, "月度产量允许低于 PR 的比例（唯一允许小数的格）"),
     "共享焊装能力": ("shared_welding_jph_max", 13, "两条焊装线合计的 JPH 上限"),
 }

@@ -1,4 +1,4 @@
-﻿"""CP-SAT generator for S1a through S1d functional cases."""
+"""CP-SAT generator for S1a through S1d functional cases."""
 from __future__ import annotations
 
 from calendar import SATURDAY
@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import date, timedelta
 from fractions import Fraction
 from math import ceil, floor
+from threading import Event, Thread
 from time import perf_counter
 
 from ortools.sat.python import cp_model
@@ -25,9 +26,12 @@ LEVEL_BUDGETS = {
 SMALL_LEVEL_BUDGETS = {level: 300.0 for level in LEVEL_BUDGETS}
 SMALL_MODEL_VARIABLES = 10000
 INITIAL_SOLUTION_BUDGET = 75.0
-# S4b computational budgets, including model construction and fixed-plan check.
-SEGMENT_REFINE_SECONDS = 35.0
+# S4b computational budgets, not business parameters. The old fixed-plan check
+# and L4/L5/L6 solves each allowed 2.0 deterministic seconds: 4 * 2.0 = 8.0
+# bounds their combined budget; this is a budget-derived bound, not a measurement.
 SEGMENT_REFINE_DETERMINISTIC = 2.0
+SEGMENT_REFINE_DETERMINISTIC_TOTAL = 8.0
+SEGMENT_REFINE_SAFETY_SECONDS = 120.0
 
 
 def hint_all(search, source, size):
@@ -144,9 +148,68 @@ def solve(data: dict, warm_start: dict | None = None) -> dict:
 
 def refine_segment(data: dict, plan: dict) -> dict:
     started = perf_counter()
-    answer = _solve(data, plan, refine_deadline=started + SEGMENT_REFINE_SECONDS)
+    deterministic_used = 0.0
+    active_solver = None
+    finished = Event()
+    timed_out = Event()
+
+    def stop_on_timeout():
+        if finished.wait(max(0, started + SEGMENT_REFINE_SAFETY_SECONDS - perf_counter())):
+            return
+        timed_out.set()
+        print(f"segment_refine=retained; reason=wall_clock_safety; "
+              f"limit_seconds={SEGMENT_REFINE_SAFETY_SECONDS}; 已停止库存细调，沿用段级排产结果。", flush=True)
+        # Repeat until refinement exits, including a timeout just before Solve starts.
+        while not finished.is_set():
+            solver = active_solver
+            if solver is not None:
+                solver.stop_search()
+            finished.wait(0.1)
+
+    def refine_solve(solver, search):
+        nonlocal deterministic_used, active_solver
+        remaining = SEGMENT_REFINE_DETERMINISTIC_TOTAL - deterministic_used
+        if timed_out.is_set() or remaining <= 0:
+            return cp_model.UNKNOWN
+        solver.parameters.max_deterministic_time = min(SEGMENT_REFINE_DETERMINISTIC, remaining)
+        active_solver = solver
+        status = solver.solve(search)
+        active_solver = None
+        deterministic_used += solver.deterministic_time
+        if timed_out.is_set() or deterministic_used > SEGMENT_REFINE_DETERMINISTIC_TOTAL:
+            return cp_model.UNKNOWN
+        return status
+
+    # 仅实际用到 rev 206 停前范围的候选增加范围变量；普通候选沿用原细调模型。
+    stop_ranges = False
+    rows = {r['date']: r for r in plan['days']}
+    for sw in plan['stop_list']:
+        pre = sw['pre_stop_date']
+        if pre is None:
+            continue
+        row = rows[pre]
+        for n in ('PS', 'PBS', 'AS_MAIN', 'AS_FIN'):
+            level = stop_level(data, n, sw['start'], sw['end'])
+            target = sw['target'] if n == 'PS' else level[0] if level else None
+            if target is None and 'BS_CLEAR' in row['phase']:
+                target = data['wip_targets'][n]
+                for c in data['conditions']:
+                    if c['type'] == 'WIP_TARGET' and c['node'] == n and c['start'] <= pre <= c['end']:
+                        target = c['target']
+            if target is not None and sum(row['eod'].get(n, {}).values()) != target:
+                stop_ranges = True
+    watchdog = Thread(target=stop_on_timeout, daemon=True)
+    watchdog.start()
+    try:
+        answer = _solve(data, plan, refine_solve=refine_solve, stop_ranges=stop_ranges)
+    finally:
+        finished.set()
+        watchdog.join()
     seconds = perf_counter() - started
-    print(f"segment_refine_seconds={seconds:.6f}; budget_seconds={SEGMENT_REFINE_SECONDS}", flush=True)
+    print(f"segment_refine_seconds={seconds:.6f}; "
+          f"segment_refine_deterministic={deterministic_used:.6f}/{SEGMENT_REFINE_DETERMINISTIC_TOTAL}", flush=True)
+    if timed_out.is_set():
+        answer = None
     if answer is None or not answer['days']:
         plan['findings'].extend(answer['findings'] if answer is not None else [
             '库存细调（WBS 越带、高于目标在制）没有完成，已沿用段级排产结果；缺口、换型、加班等主要结果不受影响。'])
@@ -155,7 +218,7 @@ def refine_segment(data: dict, plan: dict) -> dict:
 
 
 def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: bool = False,
-           refine_deadline: float | None = None) -> dict | None:
+           refine_solve=None, stop_ranges: bool = True) -> dict | None:
     factory = data["factory"]
     vehicles = list(factory["models"])
     if "WS_daily" not in data["demand"]:
@@ -552,6 +615,21 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
     stop_levels, level_used = {}, {}
     target_bound = max([rules["ps_pre_stop_target_long"], rules["ps_pre_stop_target_short"]]
                        + list(daily_targets.values()) + [c["target"] for c in manual.values()])
+    def stop_floor(n, i, target, name):
+        before = totals[n, i - 1] if i else sum(initial[n, m] for m in vehicles)
+        incoming = total_out["PS", i] if n == "PBS" else total_in[n, i]
+        lower = model.new_int_var(0, stock_bound, name)
+        model.add_min_equality(lower, [target, daily_targets[n, i], before + incoming])
+        return lower
+
+    def require_stop(n, i, target, gates, name):
+        if stop_ranges:
+            lower = stop_floor(n, i, target, name)
+            model.add(totals[n, i] >= lower).only_enforce_if(gates)
+            model.add(totals[n, i] <= target).only_enforce_if(gates)
+        else:
+            model.add(totals[n, i] == target).only_enforce_if(gates)
+
     eligible_indices = [i for i, d in enumerate(days) if d in level_days]
     for i, day in enumerate(days):
         long_stop = false
@@ -590,13 +668,13 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
             level_used[n, i] = ge(sum(matches), 1, f"level_used:{n}:{i}")
             if n != "PS":
                 model.add(stop_levels[n, i] == daily_targets[n, i]).only_enforce_if(level_used[n, i].Not())
-                model.add(totals[n, i] == stop_levels[n, i]).only_enforce_if(level_used[n, i])
+                require_stop(n, i, stop_levels[n, i], [level_used[n, i]], f"stop_floor:{n}:{i}")
             elif i in manual:
                 model.add(stop_levels[n, i] == manual[i]["target"])
             else:
                 model.add(stop_levels[n, i] == rules["ps_pre_stop_target_long"]).only_enforce_if([level_used[n, i].Not(), long_stop])
                 model.add(stop_levels[n, i] == rules["ps_pre_stop_target_short"]).only_enforce_if([level_used[n, i].Not(), long_stop.Not()])
-        model.add(totals["PS", i] == stop_levels["PS", i]).only_enforce_if(pre_stop[i])
+        require_stop("PS", i, stop_levels["PS", i], [pre_stop[i]], f"stop_floor:PS:{i}")
 
     # Carry the coming pre-stop target backwards to the BS clearing start.
     clear_requirements = []
@@ -624,33 +702,62 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
         lowering[i] = conjunction([held, coming_pre_stop[i], stop[i].Not()], f"ps_lowering:{i}")
         for n in level_nodes:
             # TODO(边界): legacy 尚未接入 rev 205 提前降库及其总装 C14 豁免，本轮不作为验收路线。
-            # TODO(边界): 没有 BS 清线时仅停前日允许降库，达不到水位即排除该候选，不增加模板。
+            # TODO(边界): 没有 BS 清线时仅停前日允许降库，达不到停前允许范围即排除该候选，不增加模板。
             level_drain[n, i] = conjunction([carried_manual[n, i],
                 ge(lowering[i] + pre_stop[i], 1, f"level_period:{n}:{i}")], f"level_drain:{n}:{i}")
             before = totals[n, i - 1] if i else sum(initial[n, m] for m in vehicles)
-            # TODO(边界): 停前人工水位高于降库入口时不支持升库；候选照常淘汰。
-            model.add(totals[n, i] <= before).only_enforce_if(level_drain[n, i])
-            model.add(totals[n, i] >= carried_levels[n, i]).only_enforce_if(level_drain[n, i])
+            if stop_ranges:
+                lower = stop_floor(n, i, carried_levels[n, i], f"drain_floor:{n}:{i}")
+                model.add(totals[n, i] >= lower).only_enforce_if(level_drain[n, i])
+            else:
+                model.add(totals[n, i] <= before).only_enforce_if(level_drain[n, i])
+                model.add(totals[n, i] >= carried_levels[n, i]).only_enforce_if(level_drain[n, i])
         capacity = sum(daily_capacities["PS", i][k] * bit for k, bit in modes["PS", i].items())
         wbs_before = totals["WBS", i - 1] if i else sum(initial["WBS", m] for m in vehicles)
         ps_before = totals["PS", i - 1] if i else sum(initial["PS", m] for m in vehicles)
         supply = wbs_before + sum(total_out[line, i] for line in welding)
         possible_in = model.new_int_var(0, stock_bound, f"lowering_in:{i}")
-        possible_out = model.new_int_var(-target_bound, stock_bound, f"lowering_out:{i}")
+        possible_out = model.new_int_var(0 if stop_ranges else -target_bound, stock_bound, f"lowering_out:{i}")
         model.add_min_equality(possible_in, [capacity, supply])
-        model.add_min_equality(possible_out, [capacity, ps_before + total_in["PS", i] - lowering_target[i]])
+        if stop_ranges:
+            available_out = model.new_int_var(0, stock_bound, f"lowering_available:{i}")
+            model.add_max_equality(available_out, [0, ps_before + total_in["PS", i] - lowering_target[i]])
+            model.add_min_equality(possible_out, [capacity, available_out])
+        else:
+            model.add_min_equality(possible_out, [capacity, ps_before + total_in["PS", i] - lowering_target[i]])
         model.add(total_in["PS", i] == possible_in).only_enforce_if(lowering[i])
         model.add(total_out["PS", i] == possible_out).only_enforce_if(lowering[i])
-        model.add(totals["PS", i] >= lowering_target[i]).only_enforce_if(lowering[i])
+        lower = (stop_floor("PS", i, lowering_target[i], f"lowering_floor:{i}")
+                 if stop_ranges else lowering_target[i])
+        model.add(totals["PS", i] >= lower).only_enforce_if(lowering[i])
+        if any(c['type'] == 'WIP_TARGET' and c['node'] == 'PBS' for c in data['conditions']):
+            # PBS 降往人工水位时按该水位保留，包括高于正常目标的水位。
+            capacity = sum(daily_capacities['AS_MAIN', i][k] * bit for k, bit in modes['AS_MAIN', i].items())
+            before = totals['PBS', i - 1] if i else sum(initial['PBS', m] for m in vehicles)
+            available_main = model.new_int_var(0, stock_bound, f"level_main_available:{i}")
+            possible_main = model.new_int_var(0, stock_bound, f"level_main_in:{i}")
+            model.add_max_equality(available_main, [0, before + total_out['PS', i] - carried_levels['PBS', i]])
+            model.add_min_equality(possible_main, [capacity, available_main])
+            model.add(total_in['AS_MAIN', i] == possible_main).only_enforce_if(level_drain['PBS', i])
         for w in ("AS_MAIN", "AS_FIN"):
             capacity = sum(daily_capacities[w, i][k] * bit for k, bit in modes[w, i].items())
             before = totals[w, i - 1] if i else sum(initial[w, m] for m in vehicles)
-            possible = model.new_int_var(-target_bound, stock_bound, f"lowering_out:{w}:{i}")
-            model.add_min_equality(possible, [capacity, before + total_in[w, i] - carried_levels[w, i]])
+            possible = model.new_int_var(0 if stop_ranges else -target_bound, stock_bound, f"lowering_out:{w}:{i}")
+            if stop_ranges:
+                available_out = model.new_int_var(0, stock_bound, f"lowering_available:{w}:{i}")
+                model.add_max_equality(available_out, [0, before + total_in[w, i] - carried_levels[w, i]])
+                model.add_min_equality(possible, [capacity, available_out])
+            else:
+                model.add_min_equality(possible, [capacity, before + total_in[w, i] - carried_levels[w, i]])
             period = ge(lowering[i] + level_drain[w, i], 1, f"assembly_lowering:{w}:{i}")
             require_clear(total_out[w, i], possible, [period], i, f"{w} OUT")
         for n in ("WBS", "PBS", "AS_MAIN", "AS_FIN"):
-            require_clear(totals[n, i], 0 if n == "WBS" else carried_levels[n, i], [lowering[i], pre_stop[i]], i, f"{n} EOD")
+            if n == "WBS":
+                require_clear(totals[n, i], 0, [lowering[i], pre_stop[i]], i, f"{n} EOD")
+            elif stop_ranges:
+                require_stop(n, i, carried_levels[n, i], [lowering[i], pre_stop[i]], f"clear_stop_floor:{n}:{i}")
+            else:
+                require_clear(totals[n, i], carried_levels[n, i], [lowering[i], pre_stop[i]], i, f"{n} EOD")
         for line in lines.values():
             require_clear(totals[line, i], 0, [bs_hold[line, i], pre_stop[i]], i, f"{line} EOD")
             # Rev 188: same-day PS intake releases physical WBS space.
@@ -733,7 +840,9 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
         continuing = conjunction([refill[i - 1], refill_done[i - 1].Not()], f"refill_continuing:{i}") if i else false
         initial_begin = int(initial_refill and not dual_initial and production_days[i] and not any(production_days[:i]))
         refill[i] = ge(continuing + bs_resume[i] + initial_begin, 1, f"refill:{i}")
-        refill_done[i] = ready[i]
+        refill_done[i] = (conjunction([ready[i], stop[i].Not(),
+                                     true if production_days[i] else false], f"refill_done:{i}")
+                          if stop_ranges else ready[i])
         for m in vehicles:
             if sum(initial[n, m] for n in nodes):
                 first_active[m, i] = false
@@ -754,7 +863,7 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
         # An idle gap while the old line is still draining is an actual stop.
         changed_line_wait = conjunction([change[i]] + not_draining, f"changed_line_wait:{i}")
         waiting = ge(refill[i] + first_start[i] + changed_line_wait, 1, f"ps_waiting:{i}")
-        model.add_max_equality(ps_restart[i], [active["PS", i], waiting if working[i] else false]
+        model.add_max_equality(ps_restart[i], [active["PS", i], waiting if (production_days[i] if stop_ranges else working[i]) else false]
                                + [active[line, i] for line in lines.values()])
         for n in nodes:
             if n in inactive:
@@ -953,13 +1062,11 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
             warm = cp_model.CpSolver()
             warm.parameters.copy_from(search_parameters)
             warm.parameters.max_deterministic_time = INITIAL_SOLUTION_BUDGET
-            if refine_deadline is not None:
+            if refine_solve is not None:
                 warm.parameters.num_workers = 1
                 warm.parameters.interleave_search = False
-                warm.parameters.max_deterministic_time = SEGMENT_REFINE_DETERMINISTIC
-                warm.parameters.max_time_in_seconds = max(0, refine_deadline - perf_counter())
             warm.parameters.stop_after_first_solution = True
-            warm_status = warm.solve(warm_model)
+            warm_status = warm.solve(warm_model) if refine_solve is None else refine_solve(warm, warm_model)
             if warm_status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
                 incumbent = warm
                 warm_feasible = True
@@ -972,7 +1079,7 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
                 reason = "fixed_plan_" + warm.status_name(warm_status)
         if reason is not None:
             print(f"warm_start=ignored; reason={reason}", flush=True)
-            if refine_deadline is not None:
+            if refine_solve is not None:
                 return result('UNKNOWN', ['库存细调（WBS 越带、高于目标在制）没有完成，已沿用段级排产结果；缺口、换型、加班等主要结果不受影响。'])
             if not seed_with_targets:
                 return None
@@ -981,7 +1088,7 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
         return not warm_feasible or tuple(source.value(expr) for _, expr in objectives) <= tuple(
             incumbent.value(expr) for _, expr in objectives)
 
-    if refine_deadline is not None:
+    if refine_solve is not None:
         # T-31 S4b / SEGMENT_PLAN §7: freeze verified high levels and true
         # changeover/clearing dates; no monthly seed or legacy cold search.
         verified = {r['level']: r['value'] for r in warm_start['objective']['levels']}
@@ -1000,13 +1107,11 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
             candidate = cp_model.CpSolver()
             candidate.parameters.random_seed = 0
             candidate.parameters.num_workers = 1
-            candidate.parameters.max_deterministic_time = SEGMENT_REFINE_DETERMINISTIC
-            candidate.parameters.max_time_in_seconds = max(0, refine_deadline - perf_counter())
             before = incumbent.value(objective)
             if before == 0:
                 status = cp_model.OPTIMAL
             else:
-                status = candidate.solve(model)
+                status = refine_solve(candidate, model)
                 if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) and warm_not_worse(candidate):
                     incumbent = candidate
             value = incumbent.value(objective)
@@ -1018,7 +1123,7 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
             hint_all(model, incumbent, len(model.proto.variables))
         objectives = []
 
-    budgets = SMALL_LEVEL_BUDGETS if refine_deadline is not None or len(model.proto.variables) <= SMALL_MODEL_VARIABLES else LEVEL_BUDGETS
+    budgets = SMALL_LEVEL_BUDGETS if refine_solve is not None or len(model.proto.variables) <= SMALL_MODEL_VARIABLES else LEVEL_BUDGETS
     coarse_bound = None
     has_overtime = any(c["type"] == "MODE_AUTH" for c in data["conditions"])
     authorization_pool = (has_overtime
@@ -1119,7 +1224,11 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
                         for t in range(max(0, begin), end_index + 1)]
                 rows = None
                 if not reason:
-                    rows = (clear_rows if kind == "清线" else refill_rows)(line, caps, expected, stop_target, limits)
+                    rows = (clear_rows(line, caps, expected, stop_target, limits,
+                                stop_levels={n: source.value(carried_levels[n, end_index])
+                                             for n in ('PBS', 'AS_MAIN', 'AS_FIN')},
+                                stop_ranges=stop_ranges) if kind == "清线" else
+                            refill_rows(line, caps, expected, stop_target, limits))
                     if rows is None:
                         reason = "产能与目标无法形成标准逐日模板"
                 if rows is not None:
@@ -1660,7 +1769,7 @@ def _solve(data: dict, warm_start: dict | None = None, *, seed_with_targets: boo
     if coarse_bound is not None:
         answer["findings"].append(f"【求解状态】年度缺口目标（L1a）当前 {sum(annual_gaps.values())} 台，下界 {coarse_bound} 台；下界来源：月度产能松弛模型。")
     for level in levels:
-        if not level["proven_optimal"] and refine_deadline is None:
+        if not level["proven_optimal"] and refine_solve is None:
             answer["findings"].append(f"【求解状态】{level['level']} 未证最优，当前值 {level['value']}。")
     answer["stop_list"] = []
     for i in range(count):

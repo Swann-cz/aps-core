@@ -7,6 +7,29 @@ from .conditions import stop_level
 from .segments import _stop_target, needs_clear
 
 
+def _stop_release(data, model, start, pre, restart, table):
+    """停前保留量及其释放量；只记库存变化，不增加完成量。"""
+    settings = table['settings']
+    line = data['factory']['models'][model]['line']
+    stop_start = (date.fromisoformat(pre) + timedelta(days=1)).isoformat()
+    stop_end = (date.fromisoformat(restart) - timedelta(days=1)).isoformat()
+    levels = {n: stop_level(data, n, stop_start, stop_end, days=table['stop_days'])
+              for n in ('PS', 'PBS', 'AS_MAIN', 'AS_FIN')}
+    length = (date.fromisoformat(restart) - date.fromisoformat(pre)).days - 1
+    clear = needs_clear(data, model, settings, pre, length)
+    target, _ = _stop_target(data, settings, pre, length, days=table['stop_days'])
+    reserve = {**settings[start]['targets'], 'PS': target}
+    if clear:
+        reserve.update({line: 0, 'WBS': 0})
+    reserve.update({n: value[0] for n, value in levels.items() if value is not None and n != 'PS'})
+    path = (line, 'WBS', 'PS', 'PBS', 'AS_MAIN', 'AS_FIN')
+    reserve = {n: value if n == 'PBS' else min(value, settings[start]['targets'][n])
+               for n, value in reserve.items()}
+    release = {n: settings[start]['targets'][n] - reserve[n] for n in path}
+    return {'release': release, 'ps_out': sum(release[n] for n in path[:3]),
+            'fin_out': sum(release.values()), 'clear': clear, 'levels': levels}
+
+
 def predict_stop(data, entry, start, pre, restart, table, limits):
     """只缩小首轮候选域；合法性仍交给原模板，失败后由调用方完整枚举。"""
     month = start[:7]
@@ -21,23 +44,11 @@ def predict_stop(data, entry, start, pre, restart, table, limits):
             and settings[d]['caps'][line] and settings[d]['caps']['PS']]
     if not work:
         return None
-    stop_start = (date.fromisoformat(pre) + timedelta(days=1)).isoformat()
-    stop_end = (date.fromisoformat(restart) - timedelta(days=1)).isoformat()
-    levels = {n: stop_level(data, n, stop_start, stop_end, days=table['stop_days'])
-              for n in ('PS', 'PBS', 'AS_MAIN', 'AS_FIN')}
-    length = (date.fromisoformat(restart) - date.fromisoformat(pre)).days - 1
-    clear = needs_clear(data, model, settings, pre, length)
+    event = _stop_release(data, model, start, pre, restart, table)
+    levels, clear = event['levels'], event['clear']
     if not any(v is not None for v in levels.values()) and not clear:
         return None
-    target, _ = _stop_target(data, settings, pre, length, days=table['stop_days'])
-    reserve = {**settings[start]['targets'], 'PS': target}
-    if clear:
-        reserve.update({line: 0, 'WBS': 0})
-    reserve.update({n: value[0] for n, value in levels.items() if value is not None and n != 'PS'})
-    path = (line, 'WBS', 'PS', 'PBS', 'AS_MAIN', 'AS_FIN')
-    release = {n: settings[start]['targets'][n] - reserve[n] for n in path}
-    ps_out = sum(release[n] for n in path[:3])
-    fin_out = sum(release.values())
+    release, ps_out, fin_out = event['release'], event['ps_out'], event['fin_out']
     # TODO(边界): 降库天数按原停前日产能折算；期间目标或产能变化仍由精确回放及完整枚举处理。
     ps_cap = table['stop_default'][pre]['caps']['PS']
     extra = max(0, fin_out - ps_out)

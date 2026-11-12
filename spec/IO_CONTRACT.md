@@ -25,8 +25,9 @@ python tools/run_case.py cases/<case-dir>                # 跑算例：生成 �
   "horizon": { "start": "2026-03-02", "end": "2026-03-11" },      // D，含首尾
   "calendar": [ { "date": "2026-03-02", "is_working_capable": true }, ... ],  // D 中每天一条；可以多带 horizon.end 之后的日子，只用来推算期末停线长度（CORE_MODEL §5 停线行，rev 159）
   "factory": {
-    "workshops": { "BS1": { "jph": 10, "cap_max": 80 }, "BS2": { "jph": 8 }, "PS": { "jph": 10 },
+    "workshops": { "BS1": { "jph": 10, "cap_max": 80, "clear_after_days": 15 }, "BS2": { "jph": 8, "clear_after_days": 4 }, "PS": { "jph": 10 },
                    "AS_MAIN": { "jph": 10 }, "AS_FIN": { "jph": 10 } },   // cap_max 选填（CORE_MODEL C6，rev 191）：车间物理上限；缺省 = 当天目标在制
+                   // clear_after_days 选填，只用于 BS1 / BS2（CORE_MODEL §5 BS 清线 rev 208）：零流窗口长度（自然日，含周末节假日）≥ 此值必须全清；整数 ≥ 3（2026-11-11 Swann：小于 3 等于每个周末都要清线，没有实际意义）；缺省 = 该线车型胶龄（旧口径）
     "buffers":   { "WBS": { "cap_max": 69 }, "PBS": { "cap_max": 150 } },  // capᴹ(n)
     "modes":     { "OFF": 0, "SINGLE_8H": 8, "SINGLE_8P2": 10, "DOUBLE_SHIFT": 16 },  // hrs(k)
     "default_mode": "SINGLE_8H",                                   // 无授权时唯一可用的非 OFF 模式
@@ -77,8 +78,10 @@ python tools/run_case.py cases/<case-dir>                # 跑算例：生成 �
 | `WIP_TARGET` | `node`（七个节点之一）、`start`、`end`、`target`（整数，≥ 0） | — |
 | `PRE_STOP_TARGET` | `pre_stop_date`、`target`（整数，≥ 0） | — |
 | `FIXED_OUTPUT` | `workshop`、`date`、`out`（整数，≥ 0） | — |
+| `MODEL_START` | `model`（须在 factory.models 中）、`date` | —（rev 208：当天该车型焊装线投入 > 0） |
+| `MODEL_QTY` | `model`、`start`、`end`、`quantity`（整数，≥ 0） | —（rev 208：段内该车型焊装投入合计 = quantity） |
 
-输入预检（生成器返回 `INPUT_INVALID`，判定器报 `INPUT`）：未知 type、缺必填字段、id 重复、日期出 horizon 或 start > end、车间 / 节点 / 模式不存在、同一节点同一天两条 `WIP_TARGET` 值不同、同一车间同一天两条 `FIXED_OUTPUT` 值不同、`FIXED_OUTPUT` 落在该车间停线日且 out > 0、`WIP_TARGET` 与全线 `SHUTDOWN`（不列 workshops 或列全五个车间）有重叠却没有盖住整段 `SHUTDOWN`（CORE_MODEL rev 204）。
+输入预检（生成器返回 `INPUT_INVALID`，判定器报 `INPUT`）：未知 type、缺必填字段、id 重复、日期出 horizon 或 start > end、车间 / 节点 / 模式不存在、同一节点同一天两条 `WIP_TARGET` 值不同、同一车间同一天两条 `FIXED_OUTPUT` 值不同、`FIXED_OUTPUT` 落在该车间停线日且 out > 0、`WIP_TARGET` 与全线 `SHUTDOWN`（不列 workshops 或列全五个车间）有重叠却没有盖住整段 `SHUTDOWN`（CORE_MODEL rev 204）；rev 208：`MODEL_START` 的车型不存在、同一车型同一天重复、指定日该车型焊装线不可生产（日历不可生产且无周六授权，或该线计划性停线）；同一车型两条 `MODEL_QTY` 日期重叠、`quantity` > 0 但段内该线没有一个可生产日；`clear_after_days` 不是 ≥ 3 的整数或写在 BS1 / BS2 以外的车间。
 
 示例（gap 组补两个周六，全线上班）：
 
@@ -141,14 +144,15 @@ python tools/run_case.py cases/<case-dir>                # 跑算例：生成 �
 
 ## 5. 目标各级的度量口径（CORE_MODEL §6 的落地）
 
-除 L1c 外全部为整数，越小越好；L1c 按公式取精确值，不取整（monthly_band_ratio = 0.1 时最多一位小数，JSON 写成数字，如 142.3；2026-10-24 定），按 L1a → L1b → L1c → L2 → L3a → L3b → L4 → L5 → L6 分级优化。
+除 L1c 外全部为整数，越小越好；L1c 按公式取精确值，不取整（monthly_band_ratio = 0.1 时最多一位小数，JSON 写成数字，如 142.3；2026-10-24 定），按 L1a → L1b → L3a → L3b → L1c → L2 → L2s → L4 → L5 → L6 分级优化（CORE_MODEL rev 207 加班是最后手段、rev 208 拆出换线次数；原顺序 L1a → L1b → L1c → L2 → L3a → L3b → L4 → L5 → L6 作废）。
 
 | 级别 | 度量 | 计算 |
 | --- | --- | --- |
 | L1a | 全期 PR 缺口（台） | Σ_m max(0, Σ_mo PR(m,mo) − Σ_d fok(m,d)) |
 | L1b | 欠交台·天 | Σ_d Σ_m bl(m,d)，bl 按 CORE_MODEL C11 由 fin0、fok、WS 逐日推出 |
 | L1c | 月度带下限缺口（台） | Σ_m Σ_mo max(0, cumPR(m,mo) − monthly_band_ratio·PR(m,mo) − cumFOK(m,mo)) |
-| L2 | 换型与清线次数 | 换型事件数 + BS 清线事件数；换型里旧线的清线属于这次换型，不另计清线；期初双线排空记 1 次换型（2026-10-25）（1a 恒为 0，1b 为 1） |
+| L2 | 清线次数（rev 208） | 换型清线事件数 + BS 清线事件数；换型里旧线的清线属于这次换型，不另计；期初双线排空记 1 次（2026-10-25）（1a 恒为 0，1b 为 1） |
+| L2s | 换线次数（rev 208） | 班组从一条焊装线换到另一条、旧线不清线（保持在制）的事件数 |
 | L3a | 周六使用量 | 非日历可生产日上采用非 OFF 模式的“车间·日”数 |
 | L3b | 非默认模式使用量 | 采用 OFF 和 default_mode 以外模式的“车间·日”数 |
 | L4 | WBS 越出经验带天数 | wbs_hi 非 null 时，WBS 合计 EOD > wbs_hi 的天数；否则 0 |

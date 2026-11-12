@@ -43,6 +43,12 @@ def _initial(data):
     return {n: {m: data["initial"]["wip"].get(n, {}).get(m, 0)
                 for m in data["factory"]["models"]} for n in data["wip_targets"]}
 
+def _pre_stop_ok(row, node, target, normal):
+    """rev 206：停前日合计水位的窄版范围。"""
+    incoming = row['workshops']['PS']['out'] if node == 'PBS' else row['workshops'][node]['in']
+    available = sum(row['bod'][node].values()) + sum(incoming.values())
+    return min(target, normal, available) <= sum(row['eod'][node].values()) <= target
+
 def _level_settings(data, settings, schedule):
     """rev 205：提前降库只覆盖所选总装班制，上游仍用原表。"""
     overrides = {d: c['level_modes'] for d, c in schedule.items() if c.get('level_modes')}
@@ -120,7 +126,7 @@ def _flows(data, stock, line, settings, *, reserves=None, weld_input=None,
              and sum(data['initial']['wip'].get(n, {}).values()) > value else value
              for p, (n, value) in enumerate(zip(path, upper))]
     if upper_overrides:
-        upper = [upper_overrides.get(n, value) for n, value in zip(path, upper)]
+        upper = [min(upper_overrides.get(n, value), value) for n, value in zip(path, upper)]
     if before[-1] > upper[-1]:
         # C6/C15：候选选择消化完成线超限库存时，少投入须让直接上游回到目标。
         upper[path.index("AS_MAIN")] = target["AS_MAIN"]
@@ -285,7 +291,7 @@ def _schedule(data, segments, settings, *, level_days=None):
         for d, restart, length, target, source, long, levels in windows:
             schedule[d].update(pre_stop=target, stop_length=length, stop_source=source)
             if not long:
-                # TODO(边界): 无 BS 清线只在停前日降库，达不到人工水位即淘汰候选，不扩模板。
+                # TODO(边界): 无 BS 清线只在停前日降库，达不到停前允许范围即淘汰候选，不扩模板。
                 schedule[d]['drain_levels'] = {**levels, 'PS': target}
                 continue
             work = [x for x in active if x <= d]
@@ -413,11 +419,15 @@ def _step(data, stock, control, settings, day, preparation_input, replenishing=F
         if control.get('drain_wbs'):
             reserve['WBS'] = 0
         # §5 合并规则：换型补满与停前目标同时成立，不能用降库覆盖 B13。
-        if 'pre_stop' in control and not replenishing:
-            reserve['PS'] = control['pre_stop']
-            reserve.update(control.get('stop_levels', {}))
+        if 'pre_stop' in control and (not replenishing or
+                sum(stock['PS'].values()) < min(target['PS'], control['pre_stop'])):
+            reserve.update({n: v if n == 'PBS' else min(target[n], v) for n, v in
+                            {'PS': control['pre_stop'], **control.get('stop_levels', {})}.items()
+                            if not replenishing or v >= target[n]})
         flow = _flows(data, stock, line, s, reserves=reserve,
-                      upper_overrides={'PS': control['pre_stop']} if 'pre_stop' in control and not replenishing else None,
+                      upper_overrides={'PS': control['pre_stop'], **control.get('stop_levels', {})}
+                      if 'pre_stop' in control and (not replenishing or
+                          sum(stock['PS'].values()) < min(target['PS'], control['pre_stop'])) else None,
                       weld_input=0, weld_output=amount, drain=True)
         phase = 'CHANGEOVER'
     else:
@@ -435,15 +445,16 @@ def _step(data, stock, control, settings, day, preparation_input, replenishing=F
             reserve.update(control.get('hold', {}))
             reserve.update(control.get('early_levels', {}))
             upper = {}
-            if 'pre_stop' in control and not (refill or replenishing):
-                reserve['PS'] = control['pre_stop']
-                reserve.update(control.get('stop_levels', {}))
-                upper = {'PS': reserve['PS']} if control['retain_water'] else {**target, 'PS': reserve['PS']}
-                upper.update(control.get('stop_levels', {}))
-                phase = 'PS_PRE_STOP'
-            elif refill:
+            if refill:
                 phase = 'FIRST_START' if first else 'REFILL'
-            elif control.get('month_last') and not control['retain_water'] and not control.get('hold'):
+            if 'pre_stop' in control and (not (refill or replenishing) or
+                    sum(stock['PS'].values()) < min(target['PS'], control['pre_stop'])):
+                levels = {'PS': control['pre_stop'], **control.get('stop_levels', {})}
+                reserve.update({n: v if n == 'PBS' else min(target[n], v) for n, v in levels.items()
+                                if not replenishing or v >= target[n]})
+                upper = dict(levels) if control['retain_water'] else {**target, **levels}
+                phase = 'PS_PRE_STOP'
+            elif not refill and control.get('month_last') and not control['retain_water'] and not control.get('hold'):
                 upper = dict(target)
             # C6/C14/C15/C17：尾差时可消化期初超上限，但有出车的
             # 普通车间仍须有正投入；直接上游在目标水位时可随之少投。
@@ -536,8 +547,9 @@ def _preparation(data, stock, control, settings, schedule, previous_weld=None):
                 continue
             if not any(settings[d]['caps'].values()):
                 continue
-            # TODO(边界): 人工停前水位高于降库入口时不升库，该候选按原筛选流程淘汰。
-            if any(not final[n] <= sum(water[n].values()) <= sum(row['bod'][n].values())
+            if any(sum(water[n].values()) < min(final[n], settings[d]['targets'][n],
+                    sum(row['bod'][n].values()) + sum((row['workshops']['PS']['out']
+                        if n == 'PBS' else row['workshops'][n]['in']).values()))
                    for n in c.get('drain_levels', {})):
                 valid = False
             # §5 PS 停前降库：投入和出车都能做尽做，不靠下游留车反压 PS。
@@ -569,7 +581,9 @@ def _preparation(data, stock, control, settings, schedule, previous_weld=None):
                 cleared = d
         # TODO(边界): 零投入准备日若跨回放片段缺少清线前日流量，不采用需该证据的尾日候选。
         if (valid and (not gap or reducible is not None and tail_out > reducible)
-                and all(sum(water[n].values()) == final[n] for n in path)):
+                and all(sum(water[n].values()) == 0 for n in (line, 'WBS'))
+                and all(_pre_stop_ok(row, n, final[n], settings[end]['targets'][n])
+                        for n in ('PS', 'PBS', 'AS_MAIN', 'AS_FIN'))):
             return amount
     # TODO(边界): 当前入口及准备日期没有合法段尾时，由候选层换日期，不证明输入无解。
     raise ValueError(f"{day}..{end}：未找到 §5 紧贴停线且能做尽做的清线模板")
@@ -597,6 +611,31 @@ def prepare_fast(data, segments):
             'rates': rates, 'events': {}}
 
 
+def _idle_phases(data, entry, first, last, schedule, settings):
+    """§5：合并相邻空闲及日历停线，月界沿用已开始的 STOP。"""
+    intervals = [(d, (date.fromisoformat(d) + timedelta(days=c['stop_length'] + 1)).isoformat())
+                 for d, c in schedule.items() if 'pre_stop' in c]
+    intervals += [(p['stop_window']['pre_stop'], p['stop_window']['restart'])
+                  for p in entry['pending_phases'] if 'stop_window' in p]
+    phases, window = {}, []
+    for day in [*settings, None]:
+        if day is not None and (schedule.get(day, {}).get('kind') == 'IDLE'
+                or not any(settings[day]['caps'].values())
+                or first <= day <= last and day not in schedule):
+            window.append(day)
+            continue
+        if not window:
+            continue
+        end = day if day is not None else _resume(data)
+        length = (date.fromisoformat(end) - date.fromisoformat(window[0])).days
+        stopped = (length >= data['rules']['ps_stop_min_days']
+            or any(a < window[-1] and window[0] < b for a, b in intervals)
+            or first > data['horizon']['start'] and first in window and entry['phase'] == 'STOP')
+        phases.update(dict.fromkeys(window, 'STOP' if stopped else 'NORMAL'))
+        window = []
+    return phases
+
+
 def replay_template(data, entry, first, last, modes, controls, *, prepared=None, fast=False, schedule=None,
                     fok_limits=None):
     """S1 记账契约：入口状态 + 日期 + 逐日班制 + 阶段/停点控制 → 一份流量。
@@ -616,6 +655,7 @@ def replay_template(data, entry, first, last, modes, controls, *, prepared=None,
     monthly = {}
     prep_input = 0
     model = controls[0]['model']
+    idle_phases = _idle_phases(data, entry, first, last, schedule, settings)
     previous_clear = 'BS_CLEAR' in state['phase']
     previous_date = next((d for d in reversed(settings) if d < first), None)
     # 逐日物理转移只有这一条链；计算月界不重置状态或 C14 段。
@@ -623,6 +663,7 @@ def replay_template(data, entry, first, last, modes, controls, *, prepared=None,
         c = schedule.get(day, {'model': model, 'kind': 'IDLE', 'segment': None})
         model = c['model']
         line = data['factory']['models'][model]['line']
+        stopped = c['kind'] == 'IDLE' and idle_phases[day] == 'STOP'
         pending = state['pending_phases']
         # §5：阶段属于触发它的车型，换车型或计算月界均不结束未完成补线。
         if c['kind'] == 'CHANGEOVER' and sum(stock[line].values()) and not any(
@@ -694,12 +735,24 @@ def replay_template(data, entry, first, last, modes, controls, *, prepared=None,
             row = _step(data, stock, c, settings, day, prep_input, replenishing)
             if tabulated:
                 prepared['events'].setdefault(day, []).append({'entry': signature, 'row': deepcopy(row)})
+        if (model not in state['started_models'] and sum(row['workshops'][line]['in'].values())
+                and not any(data['initial']['wip'].get(n, {}).get(model, 0) for n in data['wip_targets'])):
+            # 无期初在制的车型首次投入是首次启动，不继承期初补线标签。
+            pending[:] = [p for p in pending if not (p['type'] == 'REFILL'
+                          and p['model'] == model and 'stop_window' not in p)]
+            pending.append({'type': 'FIRST_START', 'model': model})
+        if row['phase'] == 'REFILL' and any(p['type'] == 'FIRST_START'
+                and p['model'] == model for p in pending):
+            row['phase'] = 'FIRST_START'
         # §5：短停后 PS 从停前目标回升不算复线；已有历史的车型重启不算首次启动。
         if row['phase'] == 'REFILL' and not replenishing and not state['refilling'] and state['current_model'] is not None and sum(row['bod'][line].values()):
             row['phase'] = 'NORMAL'
-        if row['phase'] == 'FIRST_START' and model in (state['current_model'], state['previous_model']):
+        if row['phase'] == 'FIRST_START' and model in (state['current_model'], state['previous_model']) and not any(
+                p['type'] == 'FIRST_START' and p['model'] == model for p in pending):
             row['phase'] = 'REFILL'
-        if c['kind'] not in ('PREPARE', 'BS_CLEAR'):
+        if c['kind'] == 'IDLE':
+            row['phase'] = idle_phases[day]
+        if c['kind'] not in ('IDLE', 'PREPARE', 'BS_CLEAR') and not stopped:
             phases = set(row['phase'].split('+')) | {p['type'] for p in pending if not p.get('waiting', False)}
             if replenishing:
                 phases.discard('NORMAL')
@@ -707,7 +760,7 @@ def replay_template(data, entry, first, last, modes, controls, *, prepared=None,
                 'REFILL', 'FIRST_START', 'CHANGEOVER', 'MODEL_EXIT', 'INITIAL_DRAIN') if p in phases)
         # §5：全链达标才结束；旧车型未补满的线不能被新车型的水位代替。
         pending[:] = [p for p in pending if (day < p['end'] if p['type'] == 'STOP_DRAIN' else
-            p['model'] is None or not (
+            p['type'] == 'REFILL' and stopped or p['model'] is None or not (
             all(sum(stock[n].values()) >= target[n] for n in (
                 data['factory']['models'][p['model']]['line'], 'WBS', 'PS', 'PBS', 'AS_MAIN', 'AS_FIN'))
             and (p['type'] != 'CHANGEOVER' or not sum(stock[data['factory']['models'][p['from']]['line']].values()))))]
@@ -743,7 +796,7 @@ def replay_template(data, entry, first, last, modes, controls, *, prepared=None,
             events.append({'date': day, 'type': 'PS_PRE_STOP', 'target': c['pre_stop']})
         if row['phase'] in ('REFILL', 'FIRST_START') and not state['refilling']:
             events.append({'date': day, 'type': row['phase'], 'model': model})
-        if c['kind'] != 'IDLE':
+        if not stopped:
             state['refilling'] = any(not p.get('waiting', False) for p in pending)
         state['phase'] = row['phase']
         previous_clear = 'BS_CLEAR' in row['phase']

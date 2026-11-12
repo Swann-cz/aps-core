@@ -720,7 +720,9 @@ class Judge:
         cur = resume
         while cur <= self.inp.end:
             ds = cur.isoformat()
-            if all(self.node_eod_total(ds, n) >= self.inp.node_target(n, parse_date(ds)) for n in chain):
+            if ("STOP" not in self.phases[ds].split("+")
+                    and any(self.is_production_day(w, cur) for w in WORKSHOPS)
+                    and all(self.node_eod_total(ds, n) >= self.inp.node_target(n, cur) for n in chain)):
                 refill_end = cur
                 break
             cur += timedelta(days=1)
@@ -729,7 +731,9 @@ class Judge:
         self.refill_periods.append({"start": resume.isoformat(), "end": refill_end.isoformat()})
         d = resume
         while d <= refill_end:
-            self._merge_phase(d.isoformat(), "REFILL")
+            if ("STOP" not in self.phases[d.isoformat()].split("+")
+                    and any(self.is_production_day(w, d) for w in WORKSHOPS)):
+                self._merge_phase(d.isoformat(), "REFILL")
             d += timedelta(days=1)
 
     # ---------- 3b. PS 停前降库期检测（T-17 / rev 185） ----------
@@ -836,7 +840,9 @@ class Judge:
         cur = start
         while cur <= self.inp.end:
             ds = cur.isoformat()
-            if all(self.node_eod_total(ds, n) >= self.inp.node_target(n, parse_date(ds)) for n in chain):
+            if ("STOP" not in self.phases[ds].split("+")
+                    and any(self.is_production_day(w, cur) for w in WORKSHOPS)
+                    and all(self.node_eod_total(ds, n) >= self.inp.node_target(n, cur) for n in chain)):
                 refill_end = cur
                 break
             cur += timedelta(days=1)
@@ -845,7 +851,9 @@ class Judge:
         self.refill_periods.append({"start": start.isoformat(), "end": refill_end.isoformat()})
         d = start
         while d <= refill_end:
-            self._merge_phase(d.isoformat(), "REFILL")
+            if ("STOP" not in self.phases[d.isoformat()].split("+")
+                    and any(self.is_production_day(w, d) for w in WORKSHOPS)):
+                self._merge_phase(d.isoformat(), "REFILL")
             d += timedelta(days=1)
 
     # ---------- 5. 首次启动检测 ----------

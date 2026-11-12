@@ -361,9 +361,12 @@ def main() -> int:
     from .t38 import run_t38_cases
     total_t38, fail_t38, skipped_t38 = run_t38_cases()
     fail += fail_t38
+    from .t39 import run_t39_cases
+    total_t39, fail_t39 = run_t39_cases()
+    fail += fail_t39
 
     total = (len(cases) + 1 + total_s1b + total_s1c + total_s1c_long + total_s1d
-             + total_self_idle + total_round3 + total_round4 + total_round5 + total_seq + total_caps + total_conditions + total_drain + total_refill + total_t17 + total_t18 + total_t19 + total_t24 + total_t28 + total_t31 + total_t31j2 + total_t34 + total_t36 + total_t37 + total_t38)
+             + total_self_idle + total_round3 + total_round4 + total_round5 + total_seq + total_caps + total_conditions + total_drain + total_refill + total_t17 + total_t18 + total_t19 + total_t24 + total_t28 + total_t31 + total_t31j2 + total_t34 + total_t36 + total_t37 + total_t38 + total_t39)
     skipped = skipped_round3 + skipped_round4 + skipped_caps + skipped_t38
     if skipped:
         print(f"== 结果：{total - fail}/{total} 份计划的预期条款被命中（跳过 {skipped} 份：无真实数据）==")

@@ -449,7 +449,7 @@ def check_level_drain(j: Judge):
     清线时到停前日）每天出车 = min(当日选定班制产能, 日初 + 投入 − 停前水位)；整个降库期
     （到停前日）不满产之后不得再满产。总装主线或 PBS 在降的日子（清线前），总装主线投入
     = min(当日产能, PBS 日初 + PS 出车 − PBS 保留量)，PBS 保留量在 PBS 降库时取停前水位，
-    否则取正常目标（这几天总装免 C14，由本函数代替）。不符记 PS_PRE_STOP。清线段内的出车
+    停前水位高于正常目标时也取停前水位，否则取正常目标（这几天总装免 C14）。不符记 PS_PRE_STOP。清线段内的出车
     公式由 check_clear_remainder 查。"""
     for sw in j.stop_windows:
         pre = sw.get("pre_stop_date")
@@ -465,13 +465,15 @@ def check_level_drain(j: Judge):
             cap = j.inp.cap_for_mode("AS_MAIN", j._mode(ds, "AS_MAIN") or "OFF", d)
             pbs_bod = sum(j.bod[ds].get("PBS", {}).values())
             ps_out = j.workshop_total(ds, "PS", "out")
-            keep = sw["levels"]["PBS"] if _drains_to_stop_level(j, ds, "PBS") else j.inp.node_target("PBS", d)
-            want = min(cap, pbs_bod + ps_out - keep)
+            normal = j.inp.node_target("PBS", d)
+            level = sw.get("levels", {}).get("PBS", normal)
+            keep = level if _drains_to_stop_level(j, ds, "PBS") or level > normal else normal
+            want = min(cap, max(0, pbs_bod + ps_out - keep))
             inn = j.workshop_total(ds, "AS_MAIN", "in")
             if inn != want:
                 j._err("PS_PRE_STOP", ds, "AS_MAIN", None,
                        f"提前降库总装主线投入 {inn} ≠ min(产能 {cap}, PBS 日初 {pbs_bod} + 涂装出车 {ps_out} "
-                       f"− PBS 保留 {keep}) = {want}")
+                       f"− PBS 保留 {keep}，不足取 0) = {want}")
     for sw in j.stop_windows:
         pre = sw.get("pre_stop_date")
         if pre is None:
@@ -489,7 +491,7 @@ def check_level_drain(j: Judge):
                 bod = sum(j.bod[ds].get(w, {}).values())
                 inn = j.workshop_total(ds, w, "in")
                 out = j.workshop_total(ds, w, "out")
-                want = min(cap, bod + inn - level)
+                want = min(cap, max(0, bod + inn - level))
                 if (clear is None or ds < clear) and out < want:
                     j._err("PS_PRE_STOP", ds, w, None,
                            f"提前降库 {w} 出车 {out} < 能做尽做 {want}（产能 {cap}，日初 {bod} + 投入 {inn} − 停前水位 {level}）")
@@ -1052,36 +1054,30 @@ def _stop_bs_clear_events(j: Judge, sw: dict) -> list[dict]:
 
 
 def check_pre_stop(j: Judge):
-    """PS 停前日：窗口前最后一个 PS 生产日，PS 全车型合计日末 EOD 必须精确等于停前目标
-    （人工目标优先，否则短停 ps_pre_stop_target_short / 长停 ps_pre_stop_target_long，
-    停线窗口按 PS 实际流量识别）。不等于记 PS_PRE_STOP。目标缺失（对应规则常数未在输入
-    登记）由 check_input 记 INPUT，此处跳过。
-
-    T-18 / rev 187 停线前出清：有 BS 清线的停线，停前日日末全链高于目标的在制都要作为
-    成品出掉——PBS、AS_MAIN、AS_FIN 必须回到目标（焊装、WBS = 0 由 BS 清线查，PS = 停前
-    目标由本函数查）。高于目标记 PS_PRE_STOP。
+    """rev 206：共享节点合计 EOD 在 min(停前目标, 当天 tgt, 日初 + 投入)..停前目标。
+    PS 始终核对；PBS、总装两段在有停前水位或 BS 清线时核对。焊装、WBS 清零口径不变。
     """
     for sw in j.stop_windows:
         pre = sw.get("pre_stop_date")
         target = sw.get("target")
         if pre is None or target is None:
             continue
-        total = j.node_eod_total(pre, "PS")
-        if total != target:
-            j._err("PS_PRE_STOP", pre, "PS", None,
-                   f"PS 停前日末 EOD {total} ≠ 停前目标 {target}")
-        # T-18 停线前出清：仅对有 BS 清线的停线要求下游节点回到目标；
-        # rev 204：人工目标在制盖住整次停线的节点，不论有无清线都要精确到停前水位。
         levels = sw.get("levels", {})
         cleared = bool(_stop_bs_clear_events(j, sw))
-        for node in ("PBS", "AS_MAIN", "AS_FIN"):
-            if node not in levels and not cleared:
+        for node in ("PS", "PBS", "AS_MAIN", "AS_FIN"):
+            if node != "PS" and node not in levels and not cleared:
                 continue
-            tgt = levels.get(node, j.inp.node_target(node, parse_date(pre)))
+            normal = j.inp.node_target(node, parse_date(pre))
+            tgt = target if node == "PS" else levels.get(node, normal)
+            bod = sum(j.bod[pre].get(node, {}).values())
+            inn = (j.workshop_total(pre, "PS", "out") if node == "PBS"
+                   else j.workshop_total(pre, node, "in"))
+            lower = min(tgt, normal, bod + inn)
             total = j.node_eod_total(pre, node)
-            if total != tgt:
+            if not lower <= total <= tgt:
                 j._err("PS_PRE_STOP", pre, node, None,
-                       f"停前日出清 {node} EOD {total} ≠ {'停前水位' if node in levels else '目标'} {tgt}")
+                       f"停前日 {node} EOD {total} 不在允许范围 [{lower}, {tgt}]"
+                       f"（停前目标 {tgt}，正常目标 {normal}，日初 {bod} + 投入 {inn}）")
 
 
 # ---------- PS 停前降库（rule: PS_PRE_STOP，T-17 / rev 185） ----------
@@ -1091,10 +1087,9 @@ def check_ps_clear_down(j: Judge):
     能做尽：
 
     - 投入 = min(PS 当日产能, WBS 日初 + 当日焊装出车)
-    - 出车 = min(PS 当日产能, PS 日初 + 投入 − 停前目标)
+    - 出车 = min(PS 当日产能, max(0, PS 日初 + 投入 − 停前目标))
 
-    不符记 PS_PRE_STOP（rev 185 裁决）。日末 ≥ 停前目标由出车公式蕴含；停前日日末精确
-    等于停前目标由 check_pre_stop 查。「不满的那天自然落在最后」是公式的自然结果，不另查。
+    不符记 PS_PRE_STOP。rev 206 停前日允许范围由 check_pre_stop 查。
     """
     for pd_ in j.ps_clear_down_periods:
         start = parse_date(pd_["start"])
@@ -1111,7 +1106,7 @@ def check_ps_clear_down(j: Judge):
             inn = j.workshop_total(ds, "PS", "in")
             out = j.workshop_total(ds, "PS", "out")
             want_in = min(cap, wbs_bod + weld_out)
-            want_out = min(cap, ps_bod + inn - target)
+            want_out = min(cap, max(0, ps_bod + inn - target))
             if inn != want_in:
                 j._err("PS_PRE_STOP", ds, "PS", None,
                        f"PS 停前降库期投入 {inn} ≠ min(产能 {cap}, WBS 日初 {wbs_bod} "
@@ -1119,7 +1114,7 @@ def check_ps_clear_down(j: Judge):
             if out != want_out:
                 j._err("PS_PRE_STOP", ds, "PS", None,
                        f"PS 停前降库期出车 {out} ≠ min(产能 {cap}, PS 日初 {ps_bod} "
-                       f"+ 投入 {inn} − 停前目标 {target}) = {want_out}")
+                       f"+ 投入 {inn} − 停前目标 {target}，不足取 0) = {want_out}")
             d += timedelta(days=1)
 
 
@@ -1176,7 +1171,7 @@ def check_clear_remainder(j: Judge):
                 inn_w = j.workshop_total(ds, w, "in")
                 out_w = j.workshop_total(ds, w, "out")
                 reserve_w = sw["target"] if w == "PS" else sw.get("levels", {}).get(w, j.inp.node_target(w, pre))
-                want_w = min(cap_w, bod_w + inn_w - reserve_w)
+                want_w = min(cap_w, max(0, bod_w + inn_w - reserve_w))
                 if out_w < want_w:
                     j._err("BS_CLEAR", ds, w, None,
                            f"清线段 {w} 出车 {out_w} < 能做尽做 {want_w}（产能 {cap_w}，"
@@ -1228,7 +1223,7 @@ def check_refill(j: Judge):
     BS→WBS→PS→PBS→AS 逐级补满：节点当天向下游供车时，日末 EOD 必须 ≥ tgt，否则记
     REFILL（不查 C8/C9、少出不计 C14，见相应 check 的阶段放宽）。
 
-    短停（≥3 天 PS 零流但未清线）不触发补线，复工首日即为 NORMAL；补线周期由
+    短停（≥3 天 PS 零流但未清线）不新触发补线；rev 206：已有补线跨短停延续。补线周期由
     compute_phases 的 _detect_bs_clear 在清线事件后写入 refill_periods。
     """
     for rp in j.refill_periods:
@@ -1238,6 +1233,8 @@ def check_refill(j: Judge):
             if not (s <= d <= e):
                 continue
             ds = d.isoformat()
+            if not _has_phase(j.phases.get(ds), "REFILL"):
+                continue
             for node in _refill_chain(j):
                 if not _node_supplies_downstream(j, ds, node):
                     continue
